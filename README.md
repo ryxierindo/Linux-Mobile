@@ -13,12 +13,11 @@ pkg update -y && pkg install -y wget
 
 ### Step 2 — Download and run the script
 ```bash
-wget https://raw.githubusercontent.com/<YOUR_USERNAME>/<YOUR_REPO>/main/vps-gui.sh
+wget https://raw.githubusercontent.com/ryxierindo/Linux-Mobile/main/vps-gui.sh
 chmod +x vps-gui.sh
 bash vps-gui.sh
 ```
 
-> Replace `<YOUR_USERNAME>` and `<YOUR_REPO>` with your GitHub username and repo name after uploading.
 
 ---
 
