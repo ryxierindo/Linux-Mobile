@@ -1,7 +1,7 @@
 #!/bin/bash
 # Linux VPS + GUI for Termux (PRoot)
-# Xvfb + x11vnc + XRDP bridge — fully working in proot
-# VNC Port: 5901 | RDP Port: 3389
+# Xvfb + x11vnc | VNC Port 5901
+# No Android Root Required
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
@@ -11,7 +11,7 @@ banner() {
   echo -e "${CYAN}${BOLD}"
   echo "╔══════════════════════════════════════╗"
   echo "║   Linux VPS + GUI Setup (Termux)     ║"
-  echo "║   Xvfb + VNC | No Android Root       ║"
+  echo "║   Xvfb + x11vnc | VNC Port 5901      ║"
   echo "╚══════════════════════════════════════╝"
   echo -e "${NC}"
 }
@@ -31,27 +31,27 @@ select_distro() {
   echo ""
   read -p "$(echo -e ${CYAN}Enter number [1-20]: ${NC})" c
   case $c in
-    1)  DISTRO="ubuntu";  VERSION="22.04";    PD="ubuntu" ;;
-    2)  DISTRO="ubuntu";  VERSION="20.04";    PD="ubuntu-oldlts" ;;
-    3)  DISTRO="ubuntu";  VERSION="18.04";    PD="ubuntu-oldoldlts" ;;
-    4)  DISTRO="debian";  VERSION="12";       PD="debian" ;;
-    5)  DISTRO="debian";  VERSION="11";       PD="debian-oldstable" ;;
-    6)  DISTRO="debian";  VERSION="10";       PD="debian-oldoldstable" ;;
-    7)  DISTRO="kali";    VERSION="Rolling";  PD="kali-rolling" ;;
-    8)  DISTRO="kali";    VERSION="2023.x";   PD="kali-rolling" ;;
-    9)  DISTRO="debian";  VERSION="Parrot";   PD="debian" ;;
-    10) DISTRO="alpine";  VERSION="3.18";     PD="alpine" ;;
-    11) DISTRO="alpine";  VERSION="3.17";     PD="alpine" ;;
-    12) DISTRO="fedora";  VERSION="38";       PD="fedora" ;;
-    13) DISTRO="fedora";  VERSION="37";       PD="fedora" ;;
-    14) DISTRO="arch";    VERSION="Latest";   PD="archlinux" ;;
-    15) DISTRO="arch";    VERSION="Manjaro";  PD="archlinux" ;;
-    16) DISTRO="fedora";  VERSION="CentOS 9"; PD="fedora" ;;
-    17) DISTRO="fedora";  VERSION="Rocky 9";  PD="fedora" ;;
+    1)  DISTRO="ubuntu";  VERSION="22.04";     PD="ubuntu" ;;
+    2)  DISTRO="ubuntu";  VERSION="20.04";     PD="ubuntu-oldlts" ;;
+    3)  DISTRO="ubuntu";  VERSION="18.04";     PD="ubuntu-oldoldlts" ;;
+    4)  DISTRO="debian";  VERSION="12";        PD="debian" ;;
+    5)  DISTRO="debian";  VERSION="11";        PD="debian-oldstable" ;;
+    6)  DISTRO="debian";  VERSION="10";        PD="debian-oldoldstable" ;;
+    7)  DISTRO="kali";    VERSION="Rolling";   PD="kali-rolling" ;;
+    8)  DISTRO="kali";    VERSION="2023.x";    PD="kali-rolling" ;;
+    9)  DISTRO="debian";  VERSION="Parrot";    PD="debian" ;;
+    10) DISTRO="alpine";  VERSION="3.18";      PD="alpine" ;;
+    11) DISTRO="alpine";  VERSION="3.17";      PD="alpine" ;;
+    12) DISTRO="fedora";  VERSION="38";        PD="fedora" ;;
+    13) DISTRO="fedora";  VERSION="37";        PD="fedora" ;;
+    14) DISTRO="arch";    VERSION="Latest";    PD="archlinux" ;;
+    15) DISTRO="arch";    VERSION="Manjaro";   PD="archlinux" ;;
+    16) DISTRO="fedora";  VERSION="CentOS 9";  PD="fedora" ;;
+    17) DISTRO="fedora";  VERSION="Rocky 9";   PD="fedora" ;;
     18) DISTRO="opensuse";VERSION="Tumbleweed";PD="opensuse-tumbleweed" ;;
-    19) DISTRO="void";    VERSION="Latest";   PD="void" ;;
-    20) DISTRO="gentoo";  VERSION="Latest";   PD="gentoo" ;;
-    *)  DISTRO="ubuntu";  VERSION="22.04";    PD="ubuntu" ;;
+    19) DISTRO="void";    VERSION="Latest";    PD="void" ;;
+    20) DISTRO="gentoo";  VERSION="Latest";    PD="gentoo" ;;
+    *)  DISTRO="ubuntu";  VERSION="22.04";     PD="ubuntu" ;;
   esac
   echo -e "${GREEN}Selected: ${BOLD}${DISTRO} ${VERSION}${NC}"
 }
@@ -105,19 +105,71 @@ install_distro() {
   }
 }
 
-setup_inside() {
-  echo -e "\n${YELLOW}Setting up desktop inside ${DISTRO}...${NC}"
+# Write the start-desktop.sh directly into the rootfs from Termux
+write_start_script() {
+  ROOTFS="$PREFIX/var/lib/proot-distro/installed-rootfs/${PD}"
 
-  cat > /tmp/inner.sh << HEREDOC
+  cat > "${ROOTFS}/root/start-desktop.sh" << DESKTOPEOF
+#!/bin/bash
+# Kill old sessions
+pkill x11vnc 2>/dev/null
+pkill Xvfb 2>/dev/null
+sleep 1
+rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null
+
+# Start Xvfb virtual display
+Xvfb :1 -screen 0 1280x720x24 &
+sleep 3
+
+# Start desktop on display :1
+export DISPLAY=:1
+unset DBUS_SESSION_BUS_ADDRESS
+unset SESSION_MANAGER
+dbus-launch --exit-with-session ${SESSION} &
+sleep 4
+
+# Start x11vnc sharing display :1 on port 5901
+x11vnc -display :1 \
+  -rfbport 5901 \
+  -passwd "${ROOT_PASS}" \
+  -forever \
+  -shared \
+  -noxdamage \
+  -noxfixes \
+  -bg \
+  -o /tmp/x11vnc.log
+
+echo ""
+echo "╔══════════════════════════════════════════╗"
+echo "║         ✅ DESKTOP IS RUNNING!           ║"
+echo "╠══════════════════════════════════════════╣"
+echo "║  VNC Port   : 5901                       ║"
+echo "║  Password   : (your set password)        ║"
+echo "╠══════════════════════════════════════════╣"
+echo "║  Open AVNC:                              ║"
+echo "║  Host: 127.0.0.1   Port: 5901            ║"
+echo "╚══════════════════════════════════════════╝"
+tail -f /tmp/x11vnc.log
+DESKTOPEOF
+
+  chmod +x "${ROOTFS}/root/start-desktop.sh"
+  echo -e "${GREEN}start-desktop.sh written to rootfs.${NC}"
+}
+
+setup_inside() {
+  echo -e "\n${YELLOW}Installing packages inside ${DISTRO}...${NC}"
+
+  ROOTFS="$PREFIX/var/lib/proot-distro/installed-rootfs/${PD}"
+
+  # Write install script directly into rootfs
+  cat > "${ROOTFS}/tmp/install.sh" << INSTALLEOF
 #!/bin/bash
 export DEBIAN_FRONTEND=noninteractive
 
-echo ""
-echo ">>> [1/5] Updating system..."
+echo ">>> Updating packages..."
 apt-get update -y && apt-get upgrade -y
 
-echo ""
-echo ">>> [2/5] Installing desktop + VNC tools..."
+echo ">>> Installing desktop + Xvfb + x11vnc..."
 apt-get install -y \
   ${DE} \
   xvfb \
@@ -130,16 +182,12 @@ apt-get install -y \
   papirus-icon-theme \
   arc-theme \
   nano wget curl git 2>/dev/null
-
-# fallback if some packages missing
 apt-get install -y ${DE} xvfb x11vnc dbus-x11 xauth nano wget curl 2>/dev/null || true
 
-echo ""
-echo ">>> [3/5] Setting root password..."
+echo ">>> Setting root password..."
 echo "root:${ROOT_PASS}" | chpasswd
 
-echo ""
-echo ">>> [4/5] Configuring desktop theme (Arc-Dark + Papirus)..."
+echo ">>> Applying Arc-Dark theme config..."
 mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml
 
 cat > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml << 'EOF'
@@ -167,74 +215,28 @@ cat > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml << 'EOF'
 </channel>
 EOF
 
-echo ""
-echo ">>> [5/5] Creating startup script..."
+echo ">>> Done installing."
+INSTALLEOF
 
-# Main VNC start script inside distro
-cat > /root/start-desktop.sh << 'EOF'
-#!/bin/bash
-# Kill old sessions
-pkill x11vnc 2>/dev/null
-pkill Xvfb 2>/dev/null
-sleep 1
-rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null
+  chmod +x "${ROOTFS}/tmp/install.sh"
+  proot-distro login "$PD" --user root -- bash /tmp/install.sh
 
-# Start virtual display
-Xvfb :1 -screen 0 1280x720x24 &
-XVFB_PID=\$!
-sleep 2
+  # Write start-desktop.sh into rootfs AFTER install
+  write_start_script
 
-# Start desktop session on display :1
-export DISPLAY=:1
-unset DBUS_SESSION_BUS_ADDRESS
-unset SESSION_MANAGER
-dbus-launch --exit-with-session ${SESSION} &
-sleep 3
-
-# Start x11vnc — shares the Xvfb display over VNC port 5901
-x11vnc -display :1 \
-  -rfbport 5901 \
-  -passwd "${ROOT_PASS}" \
-  -forever \
-  -shared \
-  -noxdamage \
-  -noxfixes \
-  -bg \
-  -o /var/log/x11vnc.log
-
-echo ""
-echo "╔══════════════════════════════════════════╗"
-echo "║         ✅ DESKTOP IS RUNNING!           ║"
-echo "╠══════════════════════════════════════════╣"
-echo "║  VNC Port   : 5901                       ║"
-echo "║  Password   : (your set password)        ║"
-echo "╠══════════════════════════════════════════╣"
-echo "║  Open AVNC app:                          ║"
-echo "║  Host: 127.0.0.1   Port: 5901            ║"
-echo "╚══════════════════════════════════════════╝"
-tail -f /var/log/x11vnc.log
-EOF
-chmod +x /root/start-desktop.sh
-
-echo ""
-echo ">>> Starting desktop now..."
-bash /root/start-desktop.sh
-HEREDOC
-
-  chmod +x /tmp/inner.sh
-  ROOTFS="$PREFIX/var/lib/proot-distro/installed-rootfs/${PD}"
-  cp /tmp/inner.sh "${ROOTFS}/tmp/inner.sh" 2>/dev/null || true
-  proot-distro login "$PD" --user root -- bash /tmp/inner.sh
+  echo -e "\n${YELLOW}Starting desktop...${NC}"
+  proot-distro login "$PD" --user root -- bash /root/start-desktop.sh
 }
 
-create_start_script() {
+create_termux_start() {
+  # start-vps.sh in Termux home — runs start-desktop.sh inside proot
   cat > "$HOME/start-vps.sh" << STARTEOF
 #!/bin/bash
 echo "Starting ${DISTRO} ${VERSION} + ${SESSION}..."
 proot-distro login ${PD} --user root -- bash /root/start-desktop.sh
 STARTEOF
   chmod +x "$HOME/start-vps.sh"
-  echo -e "${GREEN}Restart script saved: ${BOLD}bash ~/start-vps.sh${NC}"
+  echo -e "${GREEN}Restart script: ${BOLD}bash ~/start-vps.sh${NC}"
 }
 
 # ── MAIN ─────────────────────────────────────────────────────────────────────
@@ -244,9 +246,9 @@ select_gui
 set_password
 install_distro
 setup_inside
-create_start_script
+create_termux_start
 
-echo -e "\n${GREEN}${BOLD}Done!${NC}"
+echo -e "\n${GREEN}${BOLD}All done!${NC}"
 echo -e "${CYAN}Restart anytime: ${BOLD}bash ~/start-vps.sh${NC}"
 echo -e "${CYAN}Connect AVNC → ${BOLD}127.0.0.1:5901${NC}"
 echo -e "${CYAN}Password: ${BOLD}your set password${NC}\n"
