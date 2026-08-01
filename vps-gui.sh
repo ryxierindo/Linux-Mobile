@@ -388,47 +388,60 @@ create_new() {
 
   # ── install progress: single updating line ───────────────────────────────
   apt_progress() {
-    local cur=0 total=0 pkgname="..." start elapsed est em es pct line
+    # $1 = total packages (pre-counted), reads apt stdout for Unpacking lines
+    local total="$1" cur=0 pkgname="..." start elapsed est em es pct line
     start=$(date +%s)
+    [ "$total" -lt 1 ] 2>/dev/null && total=1
     while IFS= read -r line; do
-      if [[ "$line" =~ ([0-9]+)" newly installed" ]]; then
-        total=${BASH_REMATCH[1]}
-      fi
       if [[ "$line" =~ ^Unpacking[[:space:]]([^[:space:]:]+) ]]; then
-        cur=$((cur+1)); pkgname=${BASH_REMATCH[1]}
-        [ $total -lt 1 ] && total=1
+        cur=$((cur+1))
+        pkgname=${BASH_REMATCH[1]}
+        [ $cur -gt $total ] && total=$cur
         pct=$(( cur * 100 / total ))
         elapsed=$(( $(date +%s) - start ))
+        left=$(( total - cur ))
         if [ $cur -gt 0 ] && [ $elapsed -gt 0 ]; then
-          est=$(( elapsed * (total - cur) / cur ))
+          est=$(( elapsed * left / cur ))
         else est=0; fi
         em=$(( est / 60 )); es=$(( est % 60 ))
-        printf "\r ${C}Installing:${N} ${W}%d/%d${N}  %-30s  ${G}%d%%${N}  EST: ${Y}%dm %ds${N}   " \
-          "$cur" "$total" "$pkgname" "$pct" "$em" "$es"
+        printf "\r ${C}Installing:${N} ${W}%d/%d${N}  %-28s  ${G}%d%%${N}  Elapsed: ${Y}%ds${N}  EST: ${Y}%dm%ds${N}  Left: ${W}%d${N}   " \
+          "$cur" "$total" "$pkgname" "$pct" "$elapsed" "$em" "$es" "$left"
       fi
     done
-    printf "\r ${TICK} Done: ${W}%d/%d packages${N}  ${G}100%%${N}                                    \n" "$cur" "$cur"
+    elapsed=$(( $(date +%s) - start ))
+    printf "\r ${TICK} ${G}%d/%d packages done${N}  ${G}100%%${N}  Total time: ${Y}%ds${N}                              \n" "$cur" "$cur" "$elapsed"
+  }
+
+  # get package count via dry-run before real install
+  pkg_count() {
+    # $@ = packages to count
+    apt-get install -y --dry-run "$@" 2>/dev/null | grep -c '^Inst ' || echo 1
   }
 
   echo -e " ${C}[1/4]${N} Updating Termux packages..."
-  { pkg update -yq 2>&1 && pkg install -yq proot-distro wget curl 2>&1; } | apt_progress
+  { pkg update -yq 2>&1 && pkg install -yq proot-distro wget curl 2>&1; } | apt_progress 5
 
   echo -e " ${C}[2/4]${N} Installing $OS $VER..."
-  { proot-distro remove "$PD" 2>&1 || true; proot-distro install "$PD" 2>&1; } | apt_progress
+  { proot-distro remove "$PD" 2>&1 || true; proot-distro install "$PD" 2>&1; } | apt_progress 1
   if [ $? -ne 0 ]; then
     err "Failed — falling back to Ubuntu 22.04"
     PD="ubuntu"; OS="Ubuntu"; VER="22.04"
-    proot-distro install ubuntu 2>&1 | apt_progress
+    proot-distro install ubuntu 2>&1 | apt_progress 1
   fi
 
   echo -e " ${C}[3/4]${N} Installing desktop inside $OS..."
+  # dry-run inside distro to get total count
+  TOTAL_PKGS=$(proot-distro login "$PD" --user root -- bash -c "
+    apt-get update -yq 2>/dev/null
+    apt-get install -y --dry-run $DE xvfb x11vnc dbus-x11 x11-xserver-utils xauth xterm 2>/dev/null | grep -c '^Inst '
+  " 2>/dev/null)
+  [ -z "$TOTAL_PKGS" ] || [ "$TOTAL_PKGS" -lt 1 ] 2>/dev/null && TOTAL_PKGS=20
   proot-distro login "$PD" --user root -- bash -c "
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -y 2>&1
     apt-get install -y $DE xvfb x11vnc dbus-x11 x11-xserver-utils xauth xterm 2>&1
-    echo 'root:$PASS' | chpasswd
+    echo 'root:$PASS' | chpasswd 2>/dev/null
     mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml
-  " 2>&1 | apt_progress
+  " 2>&1 | apt_progress "$TOTAL_PKGS"
 
   echo -e " ${C}[4/4]${N} Writing startup scripts..."
 
