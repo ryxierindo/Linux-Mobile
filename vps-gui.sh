@@ -42,17 +42,54 @@ main_menu() {
     echo -e "  ${G}A)${N} Create New VPS"
     echo -e "  ${Y}B)${N} Start VPS"
     echo -e "  ${R}C)${N} Stop VPS"
+    echo -e "  ${R}E)${N} Delete VPS"
     echo -e "  ${M}D)${N} Exit"
     echo ""
-    read -p "$(echo -e ${C}Choose [A/B/C/D]: ${N})" MENU
+    read -p "$(echo -e ${C}Choose [A/B/C/D/E]: ${N})" MENU
     case "${MENU^^}" in
-      A) create_new; return ;;
-      B) start_vps;  return ;;
-      C) stop_vps;   return ;;
+      A) create_new;  return ;;
+      B) start_vps;   return ;;
+      C) stop_vps;    return ;;
+      E) delete_vps;  return ;;
       D) echo -e "\n${Y}Goodbye!${N}\n"; exit 0 ;;
-      *) err "Invalid choice. Please enter A, B, C or D."; sleep 1 ;;
+      *) err "Invalid choice. Please enter A, B, C, D or E."; sleep 1 ;;
     esac
   done
+}
+
+# ─── DELETE VPS ──────────────────────────────────────────────────────────────
+delete_vps() {
+  hdr
+  echo -e "${R}${B}  DELETE VPS${N}\n"
+  if [ ! -f "$HOME/start-vps.sh" ]; then
+    err "No VPS found. Nothing to delete."
+    read -p "Press Enter to go back..." _; main_menu; return
+  fi
+  # Read which distro is installed from the shortcut
+  local pd
+  pd=$(grep -oP 'proot-distro login \K[^ ]+' "$HOME/start-vps.sh" 2>/dev/null)
+  echo -e " ${Y}This will permanently delete the VPS and all its data.${N}"
+  [ -n "$pd" ] && echo -e " Distro: ${W}$pd${N}"
+  echo ""
+  read -p "$(echo -e ${R}Type YES to confirm delete: ${N})" CONFIRM
+  if [ "$CONFIRM" != "YES" ]; then
+    err "Cancelled."; sleep 1; main_menu; return
+  fi
+  echo -ne " Stopping VPS...  "
+  bash "$HOME/stop-vps.sh" 2>/dev/null
+  echo -e "${TICK}"
+  if [ -n "$pd" ]; then
+    echo -ne " Removing distro ${W}$pd${N}...  "
+    proot-distro remove "$pd" 2>/dev/null
+    echo -e "${TICK}"
+  fi
+  echo -ne " Removing shortcuts...  "
+  rm -f "$HOME/start-vps.sh" "$HOME/stop-vps.sh"
+  echo -e "${TICK}"
+  echo ""
+  ok "VPS deleted successfully."
+  echo ""; read -p "Press Enter to go back to menu..." _
+  main_menu
 }
 
 # ─── START VPS ────────────────────────────────────────────────────────────────
