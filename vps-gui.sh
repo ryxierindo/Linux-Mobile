@@ -339,7 +339,7 @@ create_new() {
 
   # ── STEP 5: PASSWORD ────────────────────────────────────────────────────────
   hdr
-  echo -e "${C}${B}  [5/5] Set Password${N}\n"
+  echo -e "${C}${B}  [5/6] Set Password${N}\n"
   while true; do
     read -s -p "$(echo -e ${C}Password: ${N})" PASS;  echo ""
     [ -z "$PASS" ] && err "Password cannot be empty." && sleep 1 && continue
@@ -349,6 +349,38 @@ create_new() {
   done
   ok "Password set."
   sleep 1
+
+  # ── STEP 6: INSTALL TYPE ────────────────────────────────────────────────────
+  while true; do
+    hdr
+    echo -e "${C}${B}  [6/6] Select Install Type${N}\n"
+    echo "   1) Full Linux     — complete desktop, all tools"
+    echo "   2) Simplified     — minimal install, less storage & faster"
+    echo -e "\n   ${R}0) ← Back${N}\n"
+    read -p "$(echo -e ${C}Type [0-2]: ${N})" ITYPE
+    case $ITYPE in
+      0) create_new; return ;;
+      1) INSTALL_TYPE="full";       break ;;
+      2) INSTALL_TYPE="simplified"; break ;;
+      *) err "Invalid. Enter 0, 1 or 2."; sleep 1 ;;
+    esac
+  done
+  ok "Install type: $INSTALL_TYPE"
+  sleep 1
+
+  if [ "$INSTALL_TYPE" = "simplified" ]; then
+    # Simplified: strip DE down to bare minimum — no extras, no full DE meta
+    case $SESSION in
+      startxfce4)       DE="xfce4 xfce4-terminal" ;;
+      startlxde)        DE="lxde-core" ;;
+      startlxqt)        DE="lxqt-core" ;;
+      mate-session)     DE="mate-desktop-environment-core" ;;
+      startplasma-x11)  DE="kde-plasma-desktop" ;;
+      gnome-session)    DE="gnome-core" ;;
+      openbox-session)  DE="openbox" ;;
+      i3)               DE="i3 dmenu" ;;
+    esac
+  fi
 
   # ── INSTALL ─────────────────────────────────────────────────────────────────
   hdr
@@ -491,6 +523,7 @@ chmod +x /root/stop.sh
   echo -e "${G}${B}╠══════════════════════════════════════════╣${N}"
   echo -e "${G}${B}║  ▶ Start  : bash ~/start-vps.sh          ║${N}"
   echo -e "${G}${B}║  ■ Stop   : bash ~/stop-vps.sh           ║${N}"
+  echo -e "${G}${B}║  Type   : $INSTALL_TYPE                       ${N}"
   echo -e "${G}${B}╠══════════════════════════════════════════╣${N}"
   if [ "$CONN_TYPE" = "rdp" ]; then
     echo -e "${G}${B}║  App    : RD Client                      ║${N}"
