@@ -176,27 +176,78 @@ create_new() {
     hdr
     echo -e "${C}${B}  [1/6] Select Operating System${N}\n"
     echo -e "  ${W}── Basic / General ──${N}"
-    echo "   1) Ubuntu"
-    echo "   2) Debian"
-    echo "   3) Fedora"
-    echo "   4) Kali Linux"
-    echo "   5) Alpine"
-    echo "   6) Arch Linux"
-    echo "   7) OpenSUSE"
-    echo "   8) Void Linux"
-    echo -e "\n   ${R}0) ← Back${N}\n"
-    read -p "$(echo -e ${C}OS [0-8]: ${N})" OS_CHOICE
-    case "$OS_CHOICE" in
-      0) main_menu; return ;;
-      1) OS="Ubuntu"; PD="ubuntu"; NOTE=""; break ;;
-      2) OS="Debian"; PD="debian"; NOTE=""; break ;;
-      3) OS="Fedora"; PD="fedora"; NOTE=""; break ;;
-      4) OS="Kali Linux"; PD="kali-rolling"; NOTE=""; break ;;
-      5) OS="Alpine"; PD="alpine"; NOTE=""; break ;;
-      6) OS="Arch Linux"; PD="archlinux"; NOTE=""; break ;;
-      7) OS="OpenSUSE"; PD="opensuse-tumbleweed"; NOTE=""; break ;;
-      8) OS="Void Linux"; PD="void"; NOTE=""; break ;;
-      *) err "Invalid. Enter a number between 0 and 8."; sleep 1 ;;
+    echo "   1) Ubuntu          ← Most popular, best support"
+    echo "   2) Debian          ← Rock solid, stable"
+    echo "   3) Linux Mint      ← Beginner friendly"
+    echo "   4) Zorin OS        ← Windows-like feel"
+    echo "   5) Pop!_OS         ← Great for daily use"
+    echo "   6) Elementary OS   ← macOS-like feel"
+    echo "   7) MX Linux        ← Lightweight & reliable"
+    echo ""
+    echo -e "  ${W}── Gaming ──${N}"
+    echo "   8) Garuda Linux    ← Best for gaming"
+    echo "   9) Nobara          ← Fedora gaming spin"
+    echo "  10) SteamOS         ← Steam Deck OS (Arch base)"
+    echo ""
+    echo -e "  ${W}── Security / Hacking ──${N}"
+    echo "  11) Kali Linux      ← Penetration testing"
+    echo "  12) Parrot OS       ← Security & privacy"
+    echo "  13) BlackArch       ← Advanced security"
+    echo "  14) Whonix          ← Max anonymity"
+    echo ""
+    echo -e "  ${W}── Lightweight ──${N}"
+    echo "  15) Alpine Linux    ← Minimal, very fast"
+    echo "  16) Void Linux      ← Fast & independent"
+    echo "  17) Puppy Linux     ← Runs on old hardware"
+    echo "  18) AntiX           ← Super lightweight"
+    echo ""
+    echo -e "  ${W}── Enterprise / Server ──${N}"
+    echo "  19) Fedora          ← Cutting edge, reliable"
+    echo "  20) CentOS Stream   ← Enterprise grade"
+    echo "  21) Rocky Linux     ← RHEL compatible"
+    echo "  22) AlmaLinux       ← RHEL compatible"
+    echo "  23) OpenSUSE        ← Enterprise & desktop"
+    echo ""
+    echo -e "  ${W}── Advanced / Famous ──${N}"
+    echo "  24) Arch Linux      ← DIY, bleeding edge"
+    echo "  25) Manjaro         ← Arch made easy"
+    echo "  26) Gentoo          ← Compile everything"
+    echo "  27) NixOS           ← Reproducible builds"
+    echo "  28) Slackware       ← Oldest active distro"
+    echo ""
+    echo -e "   ${R}0) ← Back to Menu${N}\n"
+    read -p "$(echo -e ${C}OS [0-28]: ${N})" OS_CHOICE
+    case $OS_CHOICE in
+      0)  main_menu; return ;;
+      1)  OS="Ubuntu";      PD="ubuntu";              NOTE=""; break ;;
+      2)  OS="Debian";      PD="debian";              NOTE=""; break ;;
+      3)  OS="Linux Mint";  PD="ubuntu";              NOTE="Mint uses Ubuntu base"; break ;;
+      4)  OS="Zorin OS";    PD="ubuntu";              NOTE="Zorin uses Ubuntu base"; break ;;
+      5)  OS="Pop!_OS";     PD="ubuntu";              NOTE="Pop uses Ubuntu base"; break ;;
+      6)  OS="Elementary";  PD="ubuntu";              NOTE="Elementary uses Ubuntu base"; break ;;
+      7)  OS="MX Linux";    PD="debian";              NOTE="MX uses Debian base"; break ;;
+      8)  OS="Garuda";      PD="archlinux";           NOTE="Garuda uses Arch base"; break ;;
+      9)  OS="Nobara";      PD="fedora";              NOTE="Nobara uses Fedora base"; break ;;
+      10) OS="SteamOS";     PD="archlinux";           NOTE="SteamOS uses Arch base"; break ;;
+      11) OS="Kali Linux";  PD="kali-rolling";        NOTE=""; break ;;
+      12) OS="Parrot OS";   PD="debian";              NOTE="Parrot uses Debian base"; break ;;
+      13) OS="BlackArch";   PD="archlinux";           NOTE="BlackArch uses Arch base"; break ;;
+      14) OS="Whonix";      PD="debian";              NOTE="Whonix uses Debian base"; break ;;
+      15) OS="Alpine";      PD="alpine";              NOTE=""; break ;;
+      16) OS="Void Linux";  PD="void";                NOTE=""; break ;;
+      17) OS="Puppy Linux"; PD="debian";              NOTE="Puppy uses Debian base"; break ;;
+      18) OS="AntiX";       PD="debian";              NOTE="AntiX uses Debian base"; break ;;
+      19) OS="Fedora";      PD="fedora";              NOTE=""; break ;;
+      20) OS="CentOS";      PD="fedora";              NOTE="CentOS uses Fedora base"; break ;;
+      21) OS="Rocky Linux"; PD="fedora";              NOTE="Rocky uses Fedora base"; break ;;
+      22) OS="AlmaLinux";   PD="fedora";              NOTE="Alma uses Fedora base"; break ;;
+      23) OS="OpenSUSE";    PD="opensuse-tumbleweed"; NOTE=""; break ;;
+      24) OS="Arch Linux";  PD="archlinux";           NOTE=""; break ;;
+      25) OS="Manjaro";     PD="archlinux";           NOTE="Manjaro uses Arch base"; break ;;
+      26) OS="Gentoo";      PD="gentoo";              NOTE=""; break ;;
+      27) OS="NixOS";       PD="ubuntu";              NOTE="NixOS uses Ubuntu base in proot"; break ;;
+      28) OS="Slackware";   PD="debian";              NOTE="Slackware uses Debian base in proot"; break ;;
+      *)  err "Invalid. Enter a number between 0 and 28."; sleep 1 ;;
     esac
   done
   ok "OS: $OS"
@@ -206,55 +257,57 @@ create_new() {
   while true; do
     hdr
     echo -e "${C}${B}  [2/6] Select Version — $OS${N}\n"
-    case "$PD" in
+    case $PD in
       ubuntu)
-        echo "   1) 22.04 LTS"
-        echo "   2) 20.04 LTS"
-        echo "   3) 18.04 LTS" ;;
+        echo "   1) 22.04 LTS Jammy   ← Recommended"
+        echo "   2) 20.04 LTS Focal"
+        echo "   3) 18.04 LTS Bionic" ;;
       debian)
-        echo "   1) Debian 12"
-        echo "   2) Debian 11"
-        echo "   3) Debian 10" ;;
+        echo "   1) Debian 12 Bookworm   ← Recommended"
+        echo "   2) Debian 11 Bullseye"
+        echo "   3) Debian 10 Buster" ;;
       fedora)
-        echo "   1) Fedora 39"
+        echo "   1) Fedora 39   ← Recommended"
         echo "   2) Fedora 38"
         echo "   3) Fedora 37" ;;
       kali-rolling)
-        echo "   1) Kali Rolling" ;;
+        echo "   1) Kali Rolling   ← Recommended" ;;
       archlinux)
-        echo "   1) Arch Latest" ;;
+        echo "   1) Arch Latest   ← Recommended" ;;
       alpine)
-        echo "   1) Alpine 3.18"
+        echo "   1) Alpine 3.18   ← Recommended"
         echo "   2) Alpine 3.17" ;;
       opensuse-tumbleweed)
-        echo "   1) Tumbleweed Rolling"
+        echo "   1) Tumbleweed Rolling   ← Recommended"
         echo "   2) Leap 15.5" ;;
       void)
-        echo "   1) Void Latest" ;;
+        echo "   1) Void Latest   ← Recommended" ;;
+      gentoo)
+        echo "   1) Gentoo Latest   ← Recommended" ;;
       *)
-        echo "   1) Latest" ;;
+        echo "   1) Latest   ← Recommended" ;;
     esac
     echo -e "   ${R}0) ← Back${N}\n"
     read -p "$(echo -e ${C}Version: ${N})" V
-    case "$PD" in
+    case $PD in
       ubuntu)
-        case "$V" in
+        case $V in
           0) create_new; return ;;
-          1) PD="ubuntu"; VER="22.04"; break ;;
-          2) PD="ubuntu-oldlts"; VER="20.04"; break ;;
+          1) PD="ubuntu";           VER="22.04"; break ;;
+          2) PD="ubuntu-oldlts";    VER="20.04"; break ;;
           3) PD="ubuntu-oldoldlts"; VER="18.04"; break ;;
           *) err "Invalid. Enter 0, 1, 2 or 3."; sleep 1 ;;
         esac ;;
       debian)
-        case "$V" in
+        case $V in
           0) create_new; return ;;
-          1) PD="debian"; VER="12"; break ;;
-          2) PD="debian-oldstable"; VER="11"; break ;;
+          1) PD="debian";              VER="12"; break ;;
+          2) PD="debian-oldstable";    VER="11"; break ;;
           3) PD="debian-oldoldstable"; VER="10"; break ;;
           *) err "Invalid. Enter 0, 1, 2 or 3."; sleep 1 ;;
         esac ;;
       fedora)
-        case "$V" in
+        case $V in
           0) create_new; return ;;
           1) VER="39"; break ;;
           2) VER="38"; break ;;
@@ -262,21 +315,21 @@ create_new() {
           *) err "Invalid. Enter 0, 1, 2 or 3."; sleep 1 ;;
         esac ;;
       alpine)
-        case "$V" in
+        case $V in
           0) create_new; return ;;
           1) VER="3.18"; break ;;
           2) VER="3.17"; break ;;
           *) err "Invalid. Enter 0, 1 or 2."; sleep 1 ;;
         esac ;;
       opensuse-tumbleweed)
-        case "$V" in
+        case $V in
           0) create_new; return ;;
           1) VER="Tumbleweed"; break ;;
           2) PD="opensuse-leap"; VER="15.5"; break ;;
           *) err "Invalid. Enter 0, 1 or 2."; sleep 1 ;;
         esac ;;
       *)
-        case "$V" in
+        case $V in
           0) create_new; return ;;
           1) VER="Latest"; break ;;
           *) err "Invalid. Enter 0 or 1."; sleep 1 ;;
@@ -289,26 +342,26 @@ create_new() {
   while true; do
     hdr
     echo -e "${C}${B}  [3/6] Select Desktop Environment${N}\n"
-    echo "   1) XFCE4"
-    echo "   2) LXDE"
-    echo "   3) LXQt"
-    echo "   4) MATE"
-    echo "   5) KDE Plasma"
-    echo "   6) GNOME"
-    echo "   7) Openbox"
-    echo "   8) i3"
+    echo "   1) XFCE4       ← Recommended (fast + good looking)"
+    echo "   2) LXDE        (very lightweight)"
+    echo "   3) LXQt        (modern lightweight)"
+    echo "   4) MATE        (classic, stable)"
+    echo "   5) KDE Plasma  (full featured, heavy)"
+    echo "   6) GNOME       (modern, heavy)"
+    echo "   7) Openbox     (minimal window manager)"
+    echo "   8) i3          (tiling window manager)"
     echo -e "\n   ${R}0) ← Back${N}\n"
     read -p "$(echo -e ${C}Desktop [0-8]: ${N})" D
-    case "$D" in
+    case $D in
       0) create_new; return ;;
-      1) DE="xfce4 xfce4-terminal"; SESSION="startxfce4"; break ;;
-      2) DE="lxde"; SESSION="startlxde"; break ;;
-      3) DE="lxqt"; SESSION="startlxqt"; break ;;
-      4) DE="mate-desktop-environment"; SESSION="mate-session"; break ;;
-      5) DE="kde-plasma-desktop"; SESSION="startplasma-x11"; break ;;
-      6) DE="gnome"; SESSION="gnome-session"; break ;;
-      7) DE="openbox obconf"; SESSION="openbox-session"; break ;;
-      8) DE="i3 i3status dmenu"; SESSION="i3"; break ;;
+      1) DE="xfce4 xfce4-terminal"; SESSION="startxfce4";       break ;;
+      2) DE="lxde";                                SESSION="startlxde";        break ;;
+      3) DE="lxqt";                                SESSION="startlxqt";        break ;;
+      4) DE="mate-desktop-environment";            SESSION="mate-session";     break ;;
+      5) DE="kde-plasma-desktop";                  SESSION="startplasma-x11"; break ;;
+      6) DE="gnome";                               SESSION="gnome-session";    break ;;
+      7) DE="openbox obconf";                      SESSION="openbox-session";  break ;;
+      8) DE="i3 i3status dmenu";                   SESSION="i3";               break ;;
       *) err "Invalid. Enter a number between 0 and 8."; sleep 1 ;;
     esac
   done
@@ -318,11 +371,11 @@ create_new() {
   while true; do
     hdr
     echo -e "${C}${B}  [4/6] Select Connection Type${N}\n"
-    echo "   1) VNC  — AVNC app on port 5901"
+    echo "   1) VNC  — AVNC app on port 5901   ← Recommended"
     echo "   2) RDP  — RD Client app on port 3390"
     echo -e "\n   ${R}0) ← Back${N}\n"
     read -p "$(echo -e ${C}Connection [0-2]: ${N})" CONN
-    case "$CONN" in
+    case $CONN in
       0) create_new; return ;;
       1) CONN_TYPE="vnc"; PORT="5901"; break ;;
       2) CONN_TYPE="rdp"; PORT="3390"; break ;;
