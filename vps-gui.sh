@@ -317,52 +317,94 @@ create_new() {
   hdr
   echo -e "${Y}${B}  Installing — please wait...${N}\n"
 
-  echo -ne " ${C}[1/4]${N} Updating Termux packages...        "
-  pkg update -yq 2>/dev/null && pkg install -yq proot-distro wget curl 2>/dev/null
-  echo -e "${TICK}"
+  # ── install progress: single updating line ───────────────────────────────
+  apt_progress() {
+    local cur=0 total=0 pkgname="..." start elapsed est em es pct line
+    start=$(date +%s)
+    while IFS= read -r line; do
+      if [[ "$line" =~ ([0-9]+)" newly installed" ]]; then
+        total=${BASH_REMATCH[1]}
+      fi
+      if [[ "$line" =~ ^Unpacking[[:space:]]([^[:space:]:]+) ]]; then
+        cur=$((cur+1)); pkgname=${BASH_REMATCH[1]}
+        [ $total -lt 1 ] && total=1
+        pct=$(( cur * 100 / total ))
+        elapsed=$(( $(date +%s) - start ))
+        if [ $cur -gt 0 ] && [ $elapsed -gt 0 ]; then
+          est=$(( elapsed * (total - cur) / cur ))
+        else est=0; fi
+        em=$(( est / 60 )); es=$(( est % 60 ))
+        printf "\r ${C}Installing:${N} ${W}%d/%d${N}  %-30s  ${G}%d%%${N}  EST: ${Y}%dm %ds${N}   " \
+          "$cur" "$total" "$pkgname" "$pct" "$em" "$es"
+      fi
+    done
+    printf "\r ${TICK} Done: ${W}%d/%d packages${N}  ${G}100%%${N}                                    \n" "$cur" "$cur"
+  }
 
-  echo -ne " ${C}[2/4]${N} Installing $OS $VER...              "
-  proot-distro remove "$PD" 2>/dev/null || true
-  proot-distro install "$PD" 2>/dev/null || {
-    echo -e "${CROSS}"
+  echo -e " ${C}[1/4]${N} Updating Termux packages..."
+  { pkg update -yq 2>&1 && pkg install -yq proot-distro wget curl 2>&1; } | apt_progress
+
+  echo -e " ${C}[2/4]${N} Installing $OS $VER..."
+  { proot-distro remove "$PD" 2>&1 || true; proot-distro install "$PD" 2>&1; } | apt_progress
+  if [ $? -ne 0 ]; then
     err "Failed — falling back to Ubuntu 22.04"
     PD="ubuntu"; OS="Ubuntu"; VER="22.04"
-    proot-distro install ubuntu 2>/dev/null
-  }
-  echo -e "${TICK}"
+    proot-distro install ubuntu 2>&1 | apt_progress
+  fi
 
-  echo -ne " ${C}[3/4]${N} Installing desktop inside $OS...   "
-
-  # Write install + start + stop scripts directly into distro via proot-distro login
-  # This avoids any ROOTFS path issues completely
+  echo -e " ${C}[3/4]${N} Installing desktop inside $OS..."
   proot-distro login "$PD" --user root -- bash -c "
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -yq 2>/dev/null
-    apt-get install -yq $DE xvfb x11vnc dbus-x11 x11-xserver-utils xauth xterm 2>/dev/null
+    apt-get update -y 2>&1
+    apt-get install -y $DE xvfb x11vnc dbus-x11 x11-xserver-utils xauth xterm 2>&1
     echo 'root:$PASS' | chpasswd
     mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml
-  " 2>/dev/null
-  echo -e "${TICK}"
+  " 2>&1 | apt_progress
 
-  echo -ne " ${C}[4/4]${N} Writing startup scripts...          "
+  echo -e " ${C}[4/4]${N} Writing startup scripts..."
 
   # Write start.sh inside distro via proot-distro login
   proot-distro login "$PD" --user root -- bash -c "
 cat > /root/start.sh << 'STARTEOF'
 #!/bin/bash
-pkill x11vnc 2>/dev/null
-pkill Xvfb 2>/dev/null
+C='\033[0;36m'; G='\033[0;32m'; Y='\033[1;33m'; W='\033[1;37m'; N='\033[0m'
+TOTAL=3
+START=\$(date +%s)
+
+step() {
+  local n=\$1 label=\$2
+  local pct=\$(( n * 100 / TOTAL ))
+  local elapsed=\$(( \$(date +%s) - START ))
+  local est=0
+  [ \$n -gt 0 ] && est=\$(( elapsed * (TOTAL - n) / n ))
+  printf "\r \${C}Starting:\${N} \${W}%d/%d\${N}  %-28s  \${G}%d%%\${N}  EST: \${Y}%ds\${N}   " \
+    "\$n" "\$TOTAL" "\$label" "\$pct" "\$est"
+}
+done_step() {
+  printf "\r \${G}✔\${N} %-28s  \${G}done\${N}                          \n" "\$1"
+}
+
+pkill x11vnc 2>/dev/null; pkill Xvfb 2>/dev/null
 sleep 1
 rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null
+
+step 1 'Display server'
 Xvfb :1 -screen 0 1280x800x24 +extension GLX +render -noreset &
 sleep 2
 export DISPLAY=:1
+done_step 'Display server'
+
+step 2 'Desktop session'
 unset DBUS_SESSION_BUS_ADDRESS SESSION_MANAGER
 dbus-launch --exit-with-session $SESSION &>/tmp/de.log &
 sleep 3
+done_step 'Desktop session'
+
+step 3 'VNC server'
 x11vnc -display :1 -rfbport $PORT -passwd '$PASS' -forever -shared -noxdamage -noxfixes -noipv6 -bg -o /tmp/vnc.log 2>/dev/null
 sleep 1
 if pgrep x11vnc > /dev/null; then
+  done_step 'VNC server'
   echo ''
   echo '╔══════════════════════════════════════════╗'
   echo '║        ✅  DESKTOP IS RUNNING!           ║'
