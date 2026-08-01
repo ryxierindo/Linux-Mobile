@@ -19,6 +19,21 @@ hdr() {
   echo -e "${N}"
 }
 
+# ─── FIND ROOTFS PATH ─────────────────────────────────────────────────────────
+get_rootfs() {
+  local pd="$1"
+  local paths=(
+    "$PREFIX/var/lib/proot-distro/installed-rootfs/${pd}"
+    "$HOME/../usr/var/lib/proot-distro/installed-rootfs/${pd}"
+    "/data/data/com.termux/files/usr/var/lib/proot-distro/installed-rootfs/${pd}"
+    "$HOME/.local/share/proot-distro/installed-rootfs/${pd}"
+  )
+  for p in "${paths[@]}"; do
+    [ -d "$p" ] && echo "$p" && return
+  done
+  echo ""
+}
+
 # ─── MAIN MENU ────────────────────────────────────────────────────────────────
 main_menu() {
   while true; do
@@ -112,8 +127,7 @@ create_new() {
     echo "  27) NixOS           ← Reproducible builds"
     echo "  28) Slackware       ← Oldest active distro"
     echo ""
-    echo -e "   ${R}0) ← Back to Menu${N}"
-    echo ""
+    echo -e "   ${R}0) ← Back to Menu${N}\n"
     read -p "$(echo -e ${C}OS [0-28]: ${N})" OS_CHOICE
     case $OS_CHOICE in
       0)  main_menu; return ;;
@@ -145,7 +159,7 @@ create_new() {
       26) OS="Gentoo";      PD="gentoo";              NOTE=""; break ;;
       27) OS="NixOS";       PD="ubuntu";              NOTE="NixOS uses Ubuntu base in proot"; break ;;
       28) OS="Slackware";   PD="debian";              NOTE="Slackware uses Debian base in proot"; break ;;
-      *)  err "Invalid. Enter a number between 0 and 28." ; sleep 1 ;;
+      *)  err "Invalid. Enter a number between 0 and 28."; sleep 1 ;;
     esac
   done
   ok "OS: $OS"
@@ -317,103 +331,74 @@ create_new() {
   }
   echo -e "${TICK}"
 
-  ROOTFS="$PREFIX/var/lib/proot-distro/installed-rootfs/${PD}"
-
-  # install.sh — written with printf, no heredoc expansion bugs
-  {
-    printf '#!/bin/bash\nexport DEBIAN_FRONTEND=noninteractive\n'
-    printf 'apt-get update -yq 2>/dev/null\n'
-    printf 'apt-get install -yq %s xvfb x11vnc dbus-x11 x11-xserver-utils xauth xterm fonts-noto papirus-icon-theme arc-theme nano wget curl git 2>/dev/null\n' "$DE"
-    printf 'echo "root:%s" | chpasswd\n' "$PASS"
-    printf 'mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml\n'
-  } > "${ROOTFS}/tmp/install.sh"
-
-  cat >> "${ROOTFS}/tmp/install.sh" << 'THEOF'
-cat > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml << 'X'
-<?xml version="1.0" encoding="UTF-8"?>
-<channel name="xsettings" version="1.0">
-  <property name="Net" type="empty">
-    <property name="ThemeName" type="string" value="Arc-Dark"/>
-    <property name="IconThemeName" type="string" value="Papirus-Dark"/>
-  </property>
-  <property name="Gtk" type="empty">
-    <property name="FontName" type="string" value="Noto Sans 10"/>
-  </property>
-</channel>
-X
-cat > /root/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml << 'X'
-<?xml version="1.0" encoding="UTF-8"?>
-<channel name="xfwm4" version="1.0">
-  <property name="general" type="empty">
-    <property name="theme" type="string" value="Arc-Dark"/>
-    <property name="title_font" type="string" value="Noto Sans Bold 9"/>
-    <property name="use_compositing" type="bool" value="true"/>
-    <property name="button_layout" type="string" value="O|HMC"/>
-  </property>
-</channel>
-X
-THEOF
-
-  chmod +x "${ROOTFS}/tmp/install.sh"
-
   echo -ne " ${C}[3/4]${N} Installing desktop inside $OS...   "
-  proot-distro login "$PD" --user root -- bash /tmp/install.sh 2>/dev/null
+
+  # Write install + start + stop scripts directly into distro via proot-distro login
+  # This avoids any ROOTFS path issues completely
+  proot-distro login "$PD" --user root -- bash -c "
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -yq 2>/dev/null
+    apt-get install -yq $DE xvfb x11vnc dbus-x11 x11-xserver-utils xauth xterm fonts-noto papirus-icon-theme arc-theme nano wget curl git 2>/dev/null
+    echo 'root:$PASS' | chpasswd
+    mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml
+  " 2>/dev/null
   echo -e "${TICK}"
 
   echo -ne " ${C}[4/4]${N} Writing startup scripts...          "
 
-  # start.sh
-  {
-    printf '#!/bin/bash\n'
-    printf 'pkill x11vnc 2>/dev/null; pkill Xvfb 2>/dev/null; sleep 1\n'
-    printf 'rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null\n'
-    printf 'Xvfb :1 -screen 0 1280x800x24 +extension GLX +render -noreset &\n'
-    printf 'sleep 2\n'
-    printf 'export DISPLAY=:1\n'
-    printf 'unset DBUS_SESSION_BUS_ADDRESS SESSION_MANAGER\n'
-    printf 'dbus-launch --exit-with-session %s &>/tmp/de.log &\n' "$SESSION"
-    printf 'sleep 3\n'
-    printf 'x11vnc -display :1 -rfbport %s -passwd "%s" -forever -shared -noxdamage -noxfixes -noipv6 -bg -o /tmp/vnc.log 2>/dev/null\n' "$PORT" "$PASS"
-    printf 'sleep 1\n'
-    printf 'if pgrep x11vnc > /dev/null; then\n'
-    printf '  echo ""\n'
-    printf '  echo "╔══════════════════════════════════════════╗"\n'
-    printf '  echo "║        ✅  DESKTOP IS RUNNING!           ║"\n'
-    printf '  echo "╠══════════════════════════════════════════╣"\n'
-    printf '  echo "║  OS     : %s %s\n' "$OS" "$VER"
-    printf '  echo "║  Desktop: %s\n' "$SESSION"
-    if [ "$CONN_TYPE" = "rdp" ]; then
-      printf '  echo "║  App    : RD Client                      ║"\n'
-    else
-      printf '  echo "║  App    : AVNC                           ║"\n'
-    fi
-    printf '  echo "║  Host   : 127.0.0.1                      ║"\n'
-    printf '  echo "║  Port   : %s                           ║"\n' "$PORT"
-    printf '  echo "║  Pass   : %s\n' "$PASS"
-    printf '  echo "╠══════════════════════════════════════════╣"\n'
-    printf '  echo "║  ■ Stop : bash ~/stop-vps.sh             ║"\n'
-    printf '  echo "╚══════════════════════════════════════════╝"\n'
-    printf 'else\n'
-    printf '  echo ""\n'
-    printf '  echo "❌ x11vnc failed. Check log:"\n'
-    printf '  cat /tmp/vnc.log\n'
-    printf 'fi\n'
-    printf 'tail -f /tmp/vnc.log\n'
-  } > "${ROOTFS}/root/start.sh"
-  chmod +x "${ROOTFS}/root/start.sh"
+  # Write start.sh inside distro via proot-distro login
+  proot-distro login "$PD" --user root -- bash -c "
+cat > /root/start.sh << 'STARTEOF'
+#!/bin/bash
+pkill x11vnc 2>/dev/null
+pkill Xvfb 2>/dev/null
+sleep 1
+rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null
+Xvfb :1 -screen 0 1280x800x24 +extension GLX +render -noreset &
+sleep 2
+export DISPLAY=:1
+unset DBUS_SESSION_BUS_ADDRESS SESSION_MANAGER
+dbus-launch --exit-with-session $SESSION &>/tmp/de.log &
+sleep 3
+x11vnc -display :1 -rfbport $PORT -passwd '$PASS' -forever -shared -noxdamage -noxfixes -noipv6 -bg -o /tmp/vnc.log 2>/dev/null
+sleep 1
+if pgrep x11vnc > /dev/null; then
+  echo ''
+  echo '╔══════════════════════════════════════════╗'
+  echo '║        ✅  DESKTOP IS RUNNING!           ║'
+  echo '╠══════════════════════════════════════════╣'
+  echo '║  OS     : $OS $VER'
+  echo '║  Desktop: $SESSION'
+  echo '║  App    : $([ "$CONN_TYPE" = "rdp" ] && echo "RD Client" || echo "AVNC")'
+  echo '║  Host   : 127.0.0.1'
+  echo '║  Port   : $PORT'
+  echo '║  Pass   : $PASS'
+  echo '╠══════════════════════════════════════════╣'
+  echo '║  Stop   : bash ~/stop-vps.sh            ║'
+  echo '╚══════════════════════════════════════════╝'
+else
+  echo '❌ x11vnc failed. Log:'
+  cat /tmp/vnc.log
+fi
+tail -f /tmp/vnc.log
+STARTEOF
+chmod +x /root/start.sh
+" 2>/dev/null
 
-  # stop.sh
-  {
-    printf '#!/bin/bash\n'
-    printf 'pkill x11vnc 2>/dev/null\n'
-    printf 'pkill Xvfb 2>/dev/null\n'
-    printf 'pkill -f "%s" 2>/dev/null\n' "$SESSION"
-    printf 'rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 /tmp/vnc.log /tmp/de.log 2>/dev/null\n'
-    printf 'echo "✔ Desktop stopped."\n'
-  } > "${ROOTFS}/root/stop.sh"
-  chmod +x "${ROOTFS}/root/stop.sh"
+  # Write stop.sh inside distro via proot-distro login
+  proot-distro login "$PD" --user root -- bash -c "
+cat > /root/stop.sh << 'STOPEOF'
+#!/bin/bash
+pkill x11vnc 2>/dev/null
+pkill Xvfb 2>/dev/null
+pkill -f '$SESSION' 2>/dev/null
+rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 /tmp/vnc.log /tmp/de.log 2>/dev/null
+echo '✔ Desktop stopped.'
+STOPEOF
+chmod +x /root/stop.sh
+" 2>/dev/null
 
-  # Termux shortcuts
+  # Write Termux shortcuts
   printf '#!/bin/bash\nproot-distro login %s --user root -- bash /root/start.sh\n' "$PD" > "$HOME/start-vps.sh"
   printf '#!/bin/bash\nproot-distro login %s --user root -- bash /root/stop.sh\n'  "$PD" > "$HOME/stop-vps.sh"
   chmod +x "$HOME/start-vps.sh" "$HOME/stop-vps.sh"
@@ -435,7 +420,7 @@ THEOF
   fi
   echo -e "${G}${B}║  Host   : 127.0.0.1                      ║${N}"
   echo -e "${G}${B}║  Port   : $PORT                              ║${N}"
-  echo -e "${G}${B}║  Pass   : $PASS${N}"
+  echo -e "${G}${B}║  Pass   : $PASS                              ${N}"
   echo -e "${G}${B}╚══════════════════════════════════════════╝${N}"
   echo ""
   echo -e "${Y}Starting desktop now...${N}\n"
