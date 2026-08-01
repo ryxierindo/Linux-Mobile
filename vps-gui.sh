@@ -446,69 +446,60 @@ create_new() {
 
   # Write start.sh inside distro via proot-distro login
   proot-distro login "$PD" --user root -- bash -c "
-cat > /root/start.sh << 'STARTEOF'
-#!/bin/bash
-C='\033[0;36m'; G='\033[0;32m'; Y='\033[1;33m'; W='\033[1;37m'; N='\033[0m'
-TOTAL=3
-START=$(date +%s)
-# fixed step durations: display=2s, desktop=3s, vnc=1s => total ~6s
-STEP_EST=(0 5 3 1)
-
-step() {
-  local n=$1 label=$2
-  local pct=$(( n * 100 / TOTAL ))
-  local elapsed=$(( $(date +%s) - START ))
-  local est=${STEP_EST[$n]}
-  printf "\r ${C}Starting:${N} ${W}%d/%d${N}  %-24s  ${G}%d%%${N}  Elapsed: ${Y}%ds${N}  EST: ${Y}%ds${N}   " \
-    "$n" "$TOTAL" "$label" "$pct" "$elapsed" "$est"
-}
-done_step() {
-  local elapsed=$(( $(date +%s) - START ))
-  printf "\r ${G}✔${N} %-24s  ${G}done${N}  Elapsed: ${Y}%ds${N}                    \n" "$1" "$elapsed"
-}
-
-pkill x11vnc 2>/dev/null; pkill Xvfb 2>/dev/null
-sleep 1
-rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null
-
-step 1 'Display server'
-Xvfb :1 -screen 0 1280x800x24 +extension GLX +render -noreset &
-sleep 2
-export DISPLAY=:1
-done_step 'Display server'
-
-step 2 'Desktop session'
-unset DBUS_SESSION_BUS_ADDRESS SESSION_MANAGER
-dbus-launch --exit-with-session $SESSION &>/tmp/de.log &
-sleep 3
-done_step 'Desktop session'
-
-step 3 'VNC server'
-x11vnc -display :1 -rfbport $PORT -passwd '$PASS' -forever -shared -noxdamage -noxfixes -noipv6 -bg -o /tmp/vnc.log 2>/dev/null
-sleep 1
-if pgrep x11vnc > /dev/null; then
-  done_step 'VNC server'
-  echo ''
-  echo '╔══════════════════════════════════════════╗'
-  echo '║        ✅  DESKTOP IS RUNNING!           ║'
-  echo '╠══════════════════════════════════════════╣'
-  echo '║  OS     : $OS $VER'
-  echo '║  Desktop: $SESSION'
-  echo '║  App    : $([ "$CONN_TYPE" = "rdp" ] && echo "RD Client" || echo "AVNC")'
-  echo '║  Host   : 127.0.0.1'
-  echo '║  Port   : $PORT'
-  echo '║  Pass   : $PASS'
-  echo '╠══════════════════════════════════════════╣'
-  echo '║  Stop   : bash ~/stop-vps.sh            ║'
-  echo '╚══════════════════════════════════════════╝'
-else
-  echo '❌ x11vnc failed. Log:'
-  cat /tmp/vnc.log
-fi
-tail -f /tmp/vnc.log
-STARTEOF
-chmod +x /root/start.sh
-" 2>/dev/null
+    printf '%s\n' \
+      '#!/bin/bash' \
+      'C=\"\\033[0;36m\"; G=\"\\033[0;32m\"; Y=\"\\033[1;33m\"; W=\"\\033[1;37m\"; N=\"\\033[0m\"' \
+      'TOTAL=3' \
+      'START=\$(date +%s)' \
+      'step() {' \
+      '  local n=\$1 label=\$2 pct elapsed est' \
+      '  pct=\$(( n * 100 / TOTAL ))' \
+      '  elapsed=\$(( \$(date +%s) - START ))' \
+      '  case \$n in 1) est=5;; 2) est=3;; *) est=1;; esac' \
+      '  printf "\\r \${C}Starting:\${N} \${W}%d/%d\${N}  %-24s  \${G}%d%%\${N}  Elapsed: \${Y}%ds\${N}  EST: \${Y}%ds\${N}   " \$n \$TOTAL "\$label" \$pct \$elapsed \$est' \
+      '}' \
+      'done_step() {' \
+      '  local elapsed=\$(( \$(date +%s) - START ))' \
+      '  printf "\\r \${G}\u2714\${N} %-24s  \${G}done\${N}  Elapsed: \${Y}%ds\${N}                    \\n" "\$1" \$elapsed' \
+      '}' \
+      'pkill x11vnc 2>/dev/null; pkill Xvfb 2>/dev/null' \
+      'sleep 1' \
+      'rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null' \
+      "step 1 'Display server'" \
+      'Xvfb :1 -screen 0 1280x800x24 +extension GLX +render -noreset &' \
+      'sleep 2' \
+      'export DISPLAY=:1' \
+      "done_step 'Display server'" \
+      "step 2 'Desktop session'" \
+      'unset DBUS_SESSION_BUS_ADDRESS SESSION_MANAGER' \
+      "dbus-launch --exit-with-session $SESSION &>/tmp/de.log &" \
+      'sleep 3' \
+      "done_step 'Desktop session'" \
+      "step 3 'VNC server'" \
+      "x11vnc -display :1 -rfbport $PORT -passwd '$PASS' -forever -shared -noxdamage -noxfixes -noipv6 -bg -o /tmp/vnc.log 2>/dev/null" \
+      'sleep 1' \
+      'if pgrep x11vnc > /dev/null; then' \
+      "  done_step 'VNC server'" \
+      "  echo ''" \
+      "  echo '\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557'" \
+      "  echo '\u2551        \u2705  DESKTOP IS RUNNING!           \u2551'" \
+      "  echo '\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563'" \
+      "  echo '\u2551  OS     : $OS $VER'" \
+      "  echo '\u2551  Desktop: $SESSION'" \
+      "  echo '\u2551  Host   : 127.0.0.1'" \
+      "  echo '\u2551  Port   : $PORT'" \
+      "  echo '\u2551  Pass   : $PASS'" \
+      "  echo '\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563'" \
+      "  echo '\u2551  Stop   : bash ~/stop-vps.sh            \u2551'" \
+      "  echo '\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d'" \
+      'else' \
+      "  echo '\u274c x11vnc failed. Log:'" \
+      '  cat /tmp/vnc.log' \
+      'fi' \
+      'tail -f /tmp/vnc.log' \
+      > /root/start.sh
+    chmod +x /root/start.sh
+  " 2>/dev/null
 
   # Write stop.sh inside distro via proot-distro login
   proot-distro login "$PD" --user root -- bash -c "
