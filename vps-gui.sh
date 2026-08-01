@@ -268,7 +268,7 @@ create_new() {
     read -p "$(echo -e ${C}Desktop [0-8]: ${N})" D
     case $D in
       0) create_new; return ;;
-      1) DE="xfce4 xfce4-goodies xfce4-terminal"; SESSION="startxfce4";       break ;;
+      1) DE="xfce4 xfce4-terminal"; SESSION="startxfce4";       break ;;
       2) DE="lxde";                                SESSION="startlxde";        break ;;
       3) DE="lxqt";                                SESSION="startlxqt";        break ;;
       4) DE="mate-desktop-environment";            SESSION="mate-session";     break ;;
@@ -338,7 +338,7 @@ create_new() {
   proot-distro login "$PD" --user root -- bash -c "
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -yq 2>/dev/null
-    apt-get install -yq $DE xvfb x11vnc dbus-x11 x11-xserver-utils xauth xterm fonts-noto papirus-icon-theme arc-theme nano wget curl git 2>/dev/null
+    apt-get install -yq $DE xvfb x11vnc dbus-x11 x11-xserver-utils xauth xterm 2>/dev/null
     echo 'root:$PASS' | chpasswd
     mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml
   " 2>/dev/null
