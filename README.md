@@ -1,70 +1,64 @@
-# Linux VPS + GUI + XRDP in Termux
+# Linux VPS + GUI — Termux
 
-Run a full Linux desktop with XRDP inside Termux using proot. Supports 20 distros, 8 desktop environments, and opens ports 19132–25565 TCP/UDP.
+Run a full Linux desktop with VNC/RDP inside proot. Supports 28 distros, 8 desktop environments. Works on Android (Termux).
 
 ---
 
-## Quick Install (Copy & Paste in Termux)
+## Quick Install
 
-### Step 1 — Update Termux & install dependencies
+### Android — Termux
 ```bash
+# Step 1 — Install Termux from F-Droid (NOT Play Store)
+# https://f-droid.org/packages/com.termux/
+
+# Step 2 — Run in Termux
 pkg update -y && pkg install -y wget
-```
-
-### Step 2 — Download and run the script
-```bash
 wget https://raw.githubusercontent.com/ryxierindo/Linux-Mobile/main/vps-gui.sh
 chmod +x vps-gui.sh
 bash vps-gui.sh
 ```
 
+---
+
+## Menu
+
+```
+A) Create New VPS   — pick OS, version, desktop, connection, password
+B) Start VPS        — start the desktop
+C) Stop VPS         — stop the desktop
+D) Exit
+```
+
+Every step has `0` to go back. Blank or invalid input always reshows the same screen.
 
 ---
 
-## What the Script Does
+## After Install — 2 Commands Only
 
-1. Shows a menu of **20 Linux distros** with version selection
-2. Shows a menu of **8 desktop environments**
-3. Prompts you to **set a root password**
-4. Installs the distro via `proot-distro`
-5. Installs the selected GUI + XRDP inside the distro
-6. Opens ports **19132–25565 TCP/UDP**
-7. Starts XRDP on port **3389**
-8. Creates `~/start-vps.sh` to restart anytime
+```bash
+bash ~/start-vps.sh   # start desktop
+bash ~/stop-vps.sh    # stop desktop
+```
 
 ---
 
-## Supported Distros
+## Supported Distros (28)
 
-| # | Distro | Version |
-|---|--------|---------|
-| 1 | Ubuntu | 22.04 LTS |
-| 2 | Ubuntu | 20.04 LTS |
-| 3 | Ubuntu | 18.04 LTS |
-| 4 | Debian | 12 Bookworm |
-| 5 | Debian | 11 Bullseye |
-| 6 | Debian | 10 Buster |
-| 7 | Kali Linux | Rolling |
-| 8 | Kali Linux | 2023.x |
-| 9 | Parrot OS | Security |
-| 10 | Alpine Linux | 3.18 |
-| 11 | Alpine Linux | 3.17 |
-| 12 | Fedora | 38 |
-| 13 | Fedora | 37 |
-| 14 | Arch Linux | Latest |
-| 15 | Manjaro | Latest |
-| 16 | CentOS Stream | 9 |
-| 17 | Rocky Linux | 9 |
-| 18 | OpenSUSE | Tumbleweed |
-| 19 | Void Linux | Latest |
-| 20 | Gentoo | Latest |
+| Category | Distros |
+|---|---|
+| Basic / General | Ubuntu, Debian, Linux Mint, Zorin OS, Pop!_OS, Elementary OS, MX Linux |
+| Gaming | Garuda Linux, Nobara, SteamOS |
+| Security | Kali Linux, Parrot OS, BlackArch, Whonix |
+| Lightweight | Alpine Linux, Void Linux, Puppy Linux, AntiX |
+| Enterprise | Fedora, CentOS Stream, Rocky Linux, AlmaLinux, OpenSUSE |
+| Advanced | Arch Linux, Manjaro, Gentoo, NixOS, Slackware |
 
 ---
 
-## Supported Desktop Environments
+## Supported Desktop Environments (8)
 
 | # | DE | Type |
-|---|----|------|
+|---|---|---|
 | 1 | XFCE4 | Lightweight ✅ Recommended |
 | 2 | LXDE | Very Lightweight |
 | 3 | LXQt | Modern Lightweight |
@@ -76,74 +70,30 @@ bash vps-gui.sh
 
 ---
 
-## RDP Connection Info
+## Connection
 
-| Field | Value |
-|-------|-------|
-| Host | `localhost:3389` or `<device-ip>:3389` |
-| Username | `root` |
-| Password | *(set during install)* |
-| Ports Open | `19132–25565 TCP/UDP` |
+| Type | App | Port |
+|---|---|---|
+| VNC ✅ Recommended | AVNC (Android) | 5901 |
+| RDP | RD Client (Android) | 3390 |
 
----
-
-## Connect via RDP
-
-- **Android**: Use [Microsoft RDP](https://play.google.com/store/apps/details?id=com.microsoft.rdc.androidx) or [AVNC](https://play.google.com/store/apps/details?id=com.gaurav.avnc)
-- **PC**: Use Windows Remote Desktop (`mstsc`) or Remmina on Linux
-- **iOS**: Use Microsoft Remote Desktop from App Store
-
----
-
-## Restart VPS After Reboot
-
-```bash
-bash ~/start-vps.sh
-```
-
----
-
-## Manual Login to Distro Shell
-
-```bash
-# Ubuntu/Debian example
-proot-distro login ubuntu --user root
-
-# Kali
-proot-distro login kali-rolling --user root
-
-# Alpine
-proot-distro login alpine --user root
-```
+### Connect on Android
+- Install **AVNC** from Play Store
+- Host: `127.0.0.1` — Port: `5901` — Password: your set password
 
 ---
 
 ## Requirements
 
-- Termux (latest from [F-Droid](https://f-droid.org/packages/com.termux/), NOT Play Store)
-- Android 7.0+
-- ~2–5 GB free storage (depends on distro + DE)
-- Internet connection
+| Platform | Requirements |
+|---|---|
+| Android | Termux from F-Droid, Android 7+, 2–5 GB free |
 
 ---
 
 ## Notes
 
-- XRDP runs on port **3389** inside proot (no root needed on Android)
-- Ports 19132–25565 are opened via iptables inside the container
-- For Minecraft Bedrock: port **19132 UDP**
-- For Minecraft Java: port **25565 TCP**
-- proot does not require Android root access
-
----
-
-## Upload to GitHub
-
-```bash
-# On your PC or Termux with git installed
-git init
-git add vps-gui.sh README.md
-git commit -m "Linux VPS GUI setup for Termux"
-git remote add origin https://github.com/<YOUR_USERNAME>/<YOUR_REPO>.git
-git push -u origin main
-```
+- No Android root required — uses proot
+- Scripts are written directly inside the distro — no path issues
+- VNC is more reliable than RDP in proot environments
+- XFCE4 recommended for best performance on mobile hardware
