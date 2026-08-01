@@ -388,60 +388,59 @@ create_new() {
 
   # ── install progress: single updating line ───────────────────────────────
   apt_progress() {
-    # $1 = total packages (pre-counted), reads apt stdout for Unpacking lines
-    local total="$1" cur=0 pkgname="..." start elapsed est em es pct line
+    local cur=0 total=0 pkgname="..." start elapsed est em es pct left line
     start=$(date +%s)
-    [ "$total" -lt 1 ] 2>/dev/null && total=1
     while IFS= read -r line; do
-      if [[ "$line" =~ ^Unpacking[[:space:]]([^[:space:]:]+) ]]; then
+      # summary line: "0 upgraded, 47 newly installed" — comes before Unpacking
+      if [[ $total -eq 0 && "$line" =~ ([0-9]+)' newly installed' ]]; then
+        local ni=${BASH_REMATCH[1]}
+        local up=0
+        [[ "$line" =~ ([0-9]+)' upgraded' ]] && up=${BASH_REMATCH[1]}
+        total=$(( ni + up ))
+      fi
+      # each package being unpacked
+      if [[ "$line" =~ ^'Unpacking '([^' ':]+) ]]; then
         cur=$((cur+1))
         pkgname=${BASH_REMATCH[1]}
+        [ $total -lt 1 ] && total=$(( cur + 10 ))
         [ $cur -gt $total ] && total=$cur
         pct=$(( cur * 100 / total ))
         elapsed=$(( $(date +%s) - start ))
         left=$(( total - cur ))
-        if [ $cur -gt 0 ] && [ $elapsed -gt 0 ]; then
+        if [ $cur -gt 1 ] && [ $elapsed -gt 0 ]; then
           est=$(( elapsed * left / cur ))
-        else est=0; fi
+        else
+          est=$(( left * 3 ))  # rough 3s/pkg before we have real data
+        fi
         em=$(( est / 60 )); es=$(( est % 60 ))
-        printf "\r ${C}Installing:${N} ${W}%d/%d${N}  %-28s  ${G}%d%%${N}  Elapsed: ${Y}%ds${N}  EST: ${Y}%dm%ds${N}  Left: ${W}%d${N}   " \
+        printf "\r ${C}Installing:${N} ${W}%d/%d${N}  %-24s  ${G}%d%%${N}  Elapsed: ${Y}%ds${N}  EST: ${Y}%dm%02ds${N}  Left: ${W}%d${N}   " \
           "$cur" "$total" "$pkgname" "$pct" "$elapsed" "$em" "$es" "$left"
       fi
     done
     elapsed=$(( $(date +%s) - start ))
-    printf "\r ${TICK} ${G}%d/%d packages done${N}  ${G}100%%${N}  Total time: ${Y}%ds${N}                              \n" "$cur" "$cur" "$elapsed"
-  }
-
-  # get package count via dry-run before real install
-  pkg_count() {
-    # $@ = packages to count
-    apt-get install -y --dry-run "$@" 2>/dev/null | grep -c '^Inst ' || echo 1
+    printf "\r ${TICK} ${G}%d packages done${N}  ${G}100%%${N}  Total time: ${Y}%dm%02ds${N}                              \n" \
+      "$cur" "$(( elapsed / 60 ))" "$(( elapsed % 60 ))"
   }
 
   echo -e " ${C}[1/4]${N} Updating Termux packages..."
-  { pkg update -yq 2>&1 && pkg install -yq proot-distro wget curl 2>&1; } | apt_progress 5
+  { pkg update -y 2>&1 && pkg install -y proot-distro wget curl 2>&1; } | apt_progress
 
   echo -e " ${C}[2/4]${N} Installing $OS $VER..."
-  { proot-distro remove "$PD" 2>&1 || true; proot-distro install "$PD" 2>&1; } | apt_progress 1
+  { proot-distro remove "$PD" 2>&1 || true; proot-distro install "$PD" 2>&1; } | apt_progress
   if [ $? -ne 0 ]; then
     err "Failed — falling back to Ubuntu 22.04"
     PD="ubuntu"; OS="Ubuntu"; VER="22.04"
-    proot-distro install ubuntu 2>&1 | apt_progress 1
+    proot-distro install ubuntu 2>&1 | apt_progress
   fi
 
   echo -e " ${C}[3/4]${N} Installing desktop inside $OS..."
-  # dry-run inside distro to get total count
-  TOTAL_PKGS=$(proot-distro login "$PD" --user root -- bash -c "
-    apt-get update -yq 2>/dev/null
-    apt-get install -y --dry-run $DE xvfb x11vnc dbus-x11 x11-xserver-utils xauth xterm 2>/dev/null | grep -c '^Inst '
-  " 2>/dev/null)
-  [ -z "$TOTAL_PKGS" ] || [ "$TOTAL_PKGS" -lt 1 ] 2>/dev/null && TOTAL_PKGS=20
   proot-distro login "$PD" --user root -- bash -c "
     export DEBIAN_FRONTEND=noninteractive
-    apt-get install -y $DE xvfb x11vnc dbus-x11 x11-xserver-utils xauth xterm 2>&1
-    echo 'root:$PASS' | chpasswd 2>/dev/null
+    apt-get update -y
+    apt-get install -y $DE xvfb x11vnc dbus-x11 x11-xserver-utils xauth xterm
+    echo 'root:$PASS' | chpasswd
     mkdir -p /root/.config/xfce4/xfconf/xfce-perchannel-xml
-  " 2>&1 | apt_progress "$TOTAL_PKGS"
+  " 2>&1 | apt_progress
 
   echo -e " ${C}[4/4]${N} Writing startup scripts..."
 
@@ -451,19 +450,21 @@ cat > /root/start.sh << 'STARTEOF'
 #!/bin/bash
 C='\033[0;36m'; G='\033[0;32m'; Y='\033[1;33m'; W='\033[1;37m'; N='\033[0m'
 TOTAL=3
-START=\$(date +%s)
+START=$(date +%s)
+# fixed step durations: display=2s, desktop=3s, vnc=1s => total ~6s
+STEP_EST=(0 5 3 1)
 
 step() {
-  local n=\$1 label=\$2
-  local pct=\$(( n * 100 / TOTAL ))
-  local elapsed=\$(( \$(date +%s) - START ))
-  local est=0
-  [ \$n -gt 0 ] && est=\$(( elapsed * (TOTAL - n) / n ))
-  printf "\r \${C}Starting:\${N} \${W}%d/%d\${N}  %-28s  \${G}%d%%\${N}  EST: \${Y}%ds\${N}   " \
-    "\$n" "\$TOTAL" "\$label" "\$pct" "\$est"
+  local n=$1 label=$2
+  local pct=$(( n * 100 / TOTAL ))
+  local elapsed=$(( $(date +%s) - START ))
+  local est=${STEP_EST[$n]}
+  printf "\r ${C}Starting:${N} ${W}%d/%d${N}  %-24s  ${G}%d%%${N}  Elapsed: ${Y}%ds${N}  EST: ${Y}%ds${N}   " \
+    "$n" "$TOTAL" "$label" "$pct" "$elapsed" "$est"
 }
 done_step() {
-  printf "\r \${G}✔\${N} %-28s  \${G}done\${N}                          \n" "\$1"
+  local elapsed=$(( $(date +%s) - START ))
+  printf "\r ${G}✔${N} %-24s  ${G}done${N}  Elapsed: ${Y}%ds${N}                    \n" "$1" "$elapsed"
 }
 
 pkill x11vnc 2>/dev/null; pkill Xvfb 2>/dev/null
