@@ -3,22 +3,20 @@
 # TermoOS Setup Script
 # Based on Debian via proot-distro
 
-# Fix for terminal drawing issues in Termux
 export TERM=xterm-256color
 
 echo "Checking required Termux packages..."
 
-# 1. Fast Dependency Check (Skips slow updates if already installed)
+# Fast Dependency Check
 if ! command -v dialog &> /dev/null || ! command -v proot-distro &> /dev/null; then
-    echo "First-time setup: Downloading dependencies (this may take a few minutes)..."
+    echo "First-time setup: Downloading dependencies..."
     pkg update -y -o Dpkg::Options::="--force-confold"
     pkg install dialog proot-distro bc ncurses-utils wget curl -y -o Dpkg::Options::="--force-confold"
 else
-    echo "Dependencies already installed. Skipping update to save time!"
+    echo "Dependencies already installed. Starting Setup..."
     sleep 1
 fi
 
-# 2. Hardware Check & Auto-Recommendation
 TOTAL_RAM=$(free -m | awk '/^Mem:/{print $2}')
 if [ "$TOTAL_RAM" -lt 4000 ]; then
     REC_TYPE="Minimal"
@@ -28,7 +26,7 @@ else
     REC_TYPE="Full"
 fi
 
-# 3. Setup Wizard UI (Added number key hints to avoid arrow freezing)
+# Setup Wizard UI
 dialog --backtitle "TermoOS Installation" --title "Welcome" --msgbox "Welcome to the TermoOS Setup!\n\nSystem will check your specs and guide you through the setup.\n\nTIP: If arrows freeze, use NUMBER KEYS (1, 2, 3) to select options." 12 50
 
 DE_CHOICE=$(dialog --clear --backtitle "TermoOS Setup" --title "Desktop Environment" \
@@ -61,114 +59,188 @@ dialog --clear --title "Ready" --yesno "Configuration complete. Begin installati
 if [ $? -ne 0 ]; then
     clear; echo "Installation aborted."; exit;
 fi
-clear
 
 # ==========================================
-# 4. Custom Progress Bar Logic
+# The Master GUI Progress Bar Function
 # ==========================================
-TOTAL_STEPS=40
+GUI_ENGINE=$(cat << 'EOF_ENGINE'
 START_TIME=$(date +%s)
-
-update_progress() {
+show_gui() {
     local STEP=$1
-    local DESC=$2
+    local TOTAL=$2
+    local DESC=$3
+    local TITLE=$4
     local CURRENT_TIME=$(date +%s)
-    local ELAPSED=$((CURRENT_TIME - START_TIME))
-    local PERCENT=$((STEP * 100 / TOTAL_STEPS))
-    local ETA_SECS=0
+    local ELAPSED_SECS=$((CURRENT_TIME - START_TIME))
+    local ELAPSED_MINS=$((ELAPSED_SECS / 60))
+    local PERCENT=$((STEP * 100 / TOTAL))
+    
+    local ETA_MINS=0
     if [ $STEP -gt 0 ]; then
-        ETA_SECS=$(( (ELAPSED / STEP) * (TOTAL_STEPS - STEP) ))
+        local ETA_SECS=$(( (ELAPSED_SECS / STEP) * (TOTAL - STEP) ))
+        ETA_MINS=$((ETA_SECS / 60))
     fi
-    local ETA_MINS=$((ETA_SECS / 60))
-    local ELAPSED_MINS=$((ELAPSED / 60))
-    local FILLED=$(( (PERCENT * 15) / 100 ))
+
+    local FILLED=$(( (PERCENT * 30) / 100 ))
     local BAR=""
-    for ((i=0; i<15; i++)); do
+    for ((i=0; i<30; i++)); do
         if [ $i -lt $FILLED ]; then BAR="${BAR}|"; else BAR="${BAR} "; fi
     done
-    printf "\r\033[K%d/%d %d%% [%-15s] EST: %d mins Elapsed: %d mins - %s" "$STEP" "$TOTAL_STEPS" "$PERCENT" "$BAR" "$ETA_MINS" "$ELAPSED_MINS" "$DESC"
+
+    clear
+    echo -e "\033[1;36m======================================================================\033[0m"
+    echo -e "\033[1;37m                       $TITLE                       \033[0m"
+    echo -e "\033[1;36m======================================================================\033[0m"
+    echo ""
+    echo -e " Module $STEP/$TOTAL: $DESC"
+    echo -e " EST : $ETA_MINS min        ELAPSED : $ELAPSED_MINS min"
+    echo -e " $PERCENT% [$BAR]"
+    echo ""
+    echo -e "\033[1;36m======================================================================\033[0m"
 }
+EOF_ENGINE
+)
+
+eval "$GUI_ENGINE"
 
 # ==========================================
-# 5. Installation Execution
+# Installation Logic
 # ==========================================
-update_progress 2 "Installing proot-distro debian base..."
+TOTAL_MODULES=8
+
+show_gui 1 $TOTAL_MODULES "proot (linux base)" "TermoOS Installation"
 proot-distro install debian > /dev/null 2>&1
 
-update_progress 10 "Updating Debian repositories..."
+show_gui 2 $TOTAL_MODULES "apt-get (system updates)" "TermoOS Installation"
 proot-distro login debian -- bash -c "apt-get update -y && apt-get upgrade -y" > /dev/null 2>&1
 
-update_progress 20 "Installing Desktop Environment..."
+show_gui 3 $TOTAL_MODULES "desktop-environment (GUI base)" "TermoOS Installation"
 if [ "$DE_CHOICE" == "3" ]; then
     proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install xfce4 xfce4-goodies -y" > /dev/null 2>&1
 elif [ "$DE_CHOICE" == "5" ]; then
     proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install openbox obconf -y" > /dev/null 2>&1
 else
-    # Fallback to XFCE if GNOME/KDE are selected but not fully scripted yet to save extreme install times
     proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install xfce4 xfce4-goodies -y" > /dev/null 2>&1
 fi
 
-update_progress 28 "Installing Firefox and VNC Server..."
-proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install tigervnc-standalone-server dbus-x11 firefox-esr nano dialog curl sudo -y" > /dev/null 2>&1
+show_gui 4 $TOTAL_MODULES "tigervnc (remote display)" "TermoOS Installation"
+proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install tigervnc-standalone-server dbus-x11 -y" > /dev/null 2>&1
 
-update_progress 33 "Configuring TermoOS commands (vnc, update)..."
+show_gui 5 $TOTAL_MODULES "firefox & wget (extras)" "TermoOS Installation"
+proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install firefox-esr nano dialog curl wget sudo -y" > /dev/null 2>&1
 
-# VNC Details Command
-proot-distro login debian -- bash -c "cat << 'EOF' > /usr/local/bin/vnc-details
+show_gui 6 $TOTAL_MODULES "vnc-config (startup scripts)" "TermoOS Installation"
+
+# Write Initial VNC Config
+proot-distro login debian -- bash -c "echo 'VNC_USER=\"$USER_NAME\"' > /etc/termo-vnc.conf"
+proot-distro login debian -- bash -c "echo 'VNC_PORT=\"5901\"' >> /etc/termo-vnc.conf"
+proot-distro login debian -- bash -c "echo 'VNC_DISPLAY=\":1\"' >> /etc/termo-vnc.conf"
+proot-distro login debian -- bash -c "echo 'VNC_PASS=\"$USER_PASS\"' >> /etc/termo-vnc.conf"
+
+# Inject 'vnc-details' command
+cat << EOF > vnc-details.tmp
 #!/bin/bash
+source /etc/termo-vnc.conf
 echo '==========================='
 echo '   TermoOS VNC Details     '
 echo '==========================='
 echo 'IP Address : 127.0.0.1'
-echo 'Port       : 5901'
-echo 'Username   : root'
-echo 'Password   : $USER_PASS'
+echo "Port       : \$VNC_PORT"
+echo "Username   : \$VNC_USER"
+echo "Password   : \$VNC_PASS"
 echo '==========================='
 EOF
-chmod +x /usr/local/bin/vnc-details"
+cat vnc-details.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/vnc-details && chmod +x /usr/local/bin/vnc-details"
+rm vnc-details.tmp
 
-# VNC Start Command
-proot-distro login debian -- bash -c "cat << 'EOF' > /usr/local/bin/vnc
+# Inject 'vnc-setup' command
+cat << EOF > vnc-setup.tmp
 #!/bin/bash
-if [ \"\$1\" == \"details\" ]; then
-    vnc-details
-    exit 0
-fi
-vncserver -kill :1 > /dev/null 2>&1
-vncserver -geometry 1280x720 -depth 24 :1
-echo 'VNC Server started! Type \"vnc details\" for info.'
-EOF
-chmod +x /usr/local/bin/vnc"
+source /etc/termo-vnc.conf
+NEW_USER=\$(dialog --clear --title "VNC Setup" --inputbox "Enter new Username:" 8 40 "\$VNC_USER" 3>&1 1>&2 2>&3)
+NEW_PORT=\$(dialog --clear --title "VNC Setup" --inputbox "Enter new VNC Port (e.g. 5901, 5902):" 8 40 "\$VNC_PORT" 3>&1 1>&2 2>&3)
+NEW_PASS=\$(dialog --clear --title "VNC Setup" --passwordbox "Enter new VNC Password:" 8 40 3>&1 1>&2 2>&3)
 
-# Setup VNC Password
+if [ -z "\$NEW_PASS" ] || [ -z "\$NEW_PORT" ]; then
+    clear; echo "Setup cancelled."; exit 1
+fi
+
+DISPLAY_NUM=\$((\$NEW_PORT - 5900))
+if [ \$DISPLAY_NUM -lt 1 ]; then DISPLAY_NUM=1; NEW_PORT=5901; fi
+
+echo "VNC_USER=\"\$NEW_USER\"" > /etc/termo-vnc.conf
+echo "VNC_PORT=\"\$NEW_PORT\"" >> /etc/termo-vnc.conf
+echo "VNC_DISPLAY=\":\$DISPLAY_NUM\"" >> /etc/termo-vnc.conf
+echo "VNC_PASS=\"\$NEW_PASS\"" >> /etc/termo-vnc.conf
+
+echo "\$NEW_PASS" | vncpasswd -f > ~/.vnc/passwd
+chmod 600 ~/.vnc/passwd
+
+clear
+echo "VNC Configuration Updated Successfully!"
+echo "Run 'vnc' to restart the server with your new settings."
+EOF
+cat vnc-setup.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/vnc-setup && chmod +x /usr/local/bin/vnc-setup"
+rm vnc-setup.tmp
+
+# Inject 'vnc' master command
+cat << EOF > vnc.tmp
+#!/bin/bash
+if [ "\$1" == "details" ]; then vnc-details; exit 0; fi
+if [ "\$1" == "setup" ]; then vnc-setup; exit 0; fi
+
+source /etc/termo-vnc.conf
+$GUI_ENGINE
+
+show_gui 1 3 "cleaning old sessions" "TermoOS Startup"
+vncserver -kill \$VNC_DISPLAY > /dev/null 2>&1
+sleep 1
+show_gui 2 3 "launching graphical desktop" "TermoOS Startup"
+vncserver -geometry 1280x720 -depth 24 \$VNC_DISPLAY > /dev/null 2>&1
+sleep 1
+show_gui 3 3 "finalizing setup" "TermoOS Startup"
+sleep 1
+clear
+echo "VNC Server started successfully on port \$VNC_PORT!"
+echo "Type 'vnc details' to view login info, or 'vnc setup' to change it."
+EOF
+cat vnc.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/vnc && chmod +x /usr/local/bin/vnc"
+rm vnc.tmp
+
+# Set the initial VNC password
 proot-distro login debian -- bash -c "mkdir -p ~/.vnc && echo '$USER_PASS' | vncpasswd -f > ~/.vnc/passwd && chmod 600 ~/.vnc/passwd" > /dev/null 2>&1
 
-# Update App Command (termo-update)
-proot-distro login debian -- bash -c "cat << 'EOF' > /usr/local/bin/termo-update
+show_gui 7 $TOTAL_MODULES "termo-update (updater module)" "TermoOS Installation"
+cat << EOF > termo-update.tmp
 #!/bin/bash
-echo '===================================='
-echo '    Updating TermoOS Packages...    '
-echo '===================================='
-apt-get update -y
-apt-get upgrade -y
-apt-get autoremove -y
-echo '===================================='
-echo '  Update Complete! System is fresh. '
-echo '===================================='
+$GUI_ENGINE
+show_gui 1 3 "syncing repositories" "TermoOS Updater"
+apt-get update -y > /dev/null 2>&1
+show_gui 2 3 "upgrading system packages" "TermoOS Updater"
+apt-get upgrade -y > /dev/null 2>&1
+show_gui 3 3 "cleaning up old files" "TermoOS Updater"
+apt-get autoremove -y > /dev/null 2>&1
+sleep 1
+clear
+echo 'System Update Complete! TermoOS is fresh.'
 EOF
-chmod +x /usr/local/bin/termo-update"
+cat termo-update.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/termo-update && chmod +x /usr/local/bin/termo-update"
+rm termo-update.tmp
 
-update_progress 38 "Fetching TermoOS App Store (Modules)..."
-# Corrected GitHub URL to your repository
+show_gui 8 $TOTAL_MODULES "termo-modules (app store)" "TermoOS Installation"
 proot-distro login debian -- bash -c "curl -s https://raw.githubusercontent.com/ryxierindo/Linux-Mobile/main/termo-modules.sh -o /usr/local/bin/termo-modules && chmod +x /usr/local/bin/termo-modules" > /dev/null 2>&1
 
-update_progress 40 "Installation Complete!"
+sleep 1
+clear
+
+# Final Success Message
 echo -e "\n\nSuccess! TermoOS is installed."
 echo "----------------------------------------"
 echo "To enter TermoOS, type: proot-distro login debian"
 echo "Inside TermoOS, you can use these commands:"
-echo " - vnc          (Starts the desktop)"
+echo " - vnc          (Starts desktop)"
 echo " - vnc details  (Shows login info)"
-echo " - termo-update (Updates the system)"
+echo " - vnc setup    (Changes port/username/password)"
+echo " - termo-update (Updates system)"
 echo " - termo-modules(Installs extra apps)"
 echo "----------------------------------------"
