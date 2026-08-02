@@ -61,7 +61,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # ==========================================
-# The Master GUI Progress Bar Function
+# The Master GUI Progress Bar Function (Blue Screen)
 # ==========================================
 GUI_ENGINE=$(cat << 'EOF_ENGINE'
 START_TIME=$(date +%s)
@@ -81,22 +81,9 @@ show_gui() {
         ETA_MINS=$((ETA_SECS / 60))
     fi
 
-    local FILLED=$(( (PERCENT * 30) / 100 ))
-    local BAR=""
-    for ((i=0; i<30; i++)); do
-        if [ $i -lt $FILLED ]; then BAR="${BAR}|"; else BAR="${BAR} "; fi
-    done
-
-    clear
-    echo -e "\033[1;36m======================================================================\033[0m"
-    echo -e "\033[1;37m                       $TITLE                       \033[0m"
-    echo -e "\033[1;36m======================================================================\033[0m"
-    echo ""
-    echo -e " Module $STEP/$TOTAL: $DESC"
-    echo -e " EST : $ETA_MINS min        ELAPSED : $ELAPSED_MINS min"
-    echo -e " $PERCENT% [$BAR]"
-    echo ""
-    echo -e "\033[1;36m======================================================================\033[0m"
+    # The Blue Screen GUI Progress Bar
+    echo "$PERCENT" | dialog --title "$TITLE" --backtitle "TermoOS Setup" \
+    --gauge "Module $STEP/$TOTAL: $DESC\n\nEST : $ETA_MINS min     ELAPSED : $ELAPSED_MINS min" 10 45
 }
 EOF_ENGINE
 )
@@ -108,13 +95,13 @@ eval "$GUI_ENGINE"
 # ==========================================
 TOTAL_MODULES=8
 
-show_gui 1 $TOTAL_MODULES "proot (linux base)" "TermoOS Installation"
+show_gui 1 $TOTAL_MODULES "proot (linux base)" "Installing TermoOS"
 proot-distro install debian > /dev/null 2>&1
 
-show_gui 2 $TOTAL_MODULES "apt-get (system updates)" "TermoOS Installation"
+show_gui 2 $TOTAL_MODULES "apt-get (system updates)" "Installing TermoOS"
 proot-distro login debian -- bash -c "apt-get update -y && apt-get upgrade -y" > /dev/null 2>&1
 
-show_gui 3 $TOTAL_MODULES "desktop-environment (GUI base)" "TermoOS Installation"
+show_gui 3 $TOTAL_MODULES "desktop-environment (GUI base)" "Installing TermoOS"
 if [ "$DE_CHOICE" == "3" ]; then
     proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install xfce4 xfce4-goodies -y" > /dev/null 2>&1
 elif [ "$DE_CHOICE" == "5" ]; then
@@ -123,13 +110,13 @@ else
     proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install xfce4 xfce4-goodies -y" > /dev/null 2>&1
 fi
 
-show_gui 4 $TOTAL_MODULES "tigervnc (remote display)" "TermoOS Installation"
+show_gui 4 $TOTAL_MODULES "tigervnc (remote display)" "Installing TermoOS"
 proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install tigervnc-standalone-server dbus-x11 -y" > /dev/null 2>&1
 
-show_gui 5 $TOTAL_MODULES "firefox & wget (extras)" "TermoOS Installation"
+show_gui 5 $TOTAL_MODULES "firefox & wget (extras)" "Installing TermoOS"
 proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install firefox-esr nano dialog curl wget sudo -y" > /dev/null 2>&1
 
-show_gui 6 $TOTAL_MODULES "vnc-config (startup scripts)" "TermoOS Installation"
+show_gui 6 $TOTAL_MODULES "vnc-config (startup scripts)" "Installing TermoOS"
 
 # Write Initial VNC Config
 proot-distro login debian -- bash -c "echo 'VNC_USER=\"$USER_NAME\"' > /etc/termo-vnc.conf"
@@ -183,7 +170,7 @@ EOF
 cat vnc-setup.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/vnc-setup && chmod +x /usr/local/bin/vnc-setup"
 rm vnc-setup.tmp
 
-# Inject 'vnc' master command
+# Inject 'vnc' master command (Now uses the blue GUI engine)
 cat << EOF > vnc.tmp
 #!/bin/bash
 if [ "\$1" == "details" ]; then vnc-details; exit 0; fi
@@ -210,7 +197,9 @@ rm vnc.tmp
 # Set the initial VNC password
 proot-distro login debian -- bash -c "mkdir -p ~/.vnc && echo '$USER_PASS' | vncpasswd -f > ~/.vnc/passwd && chmod 600 ~/.vnc/passwd" > /dev/null 2>&1
 
-show_gui 7 $TOTAL_MODULES "termo-update (updater module)" "TermoOS Installation"
+show_gui 7 $TOTAL_MODULES "termo-update (updater module)" "Installing TermoOS"
+
+# Inject UPDATE command (Now uses the blue GUI engine)
 cat << EOF > termo-update.tmp
 #!/bin/bash
 $GUI_ENGINE
@@ -227,7 +216,7 @@ EOF
 cat termo-update.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/termo-update && chmod +x /usr/local/bin/termo-update"
 rm termo-update.tmp
 
-show_gui 8 $TOTAL_MODULES "termo-modules (app store)" "TermoOS Installation"
+show_gui 8 $TOTAL_MODULES "termo-modules (app store)" "Installing TermoOS"
 proot-distro login debian -- bash -c "curl -s https://raw.githubusercontent.com/ryxierindo/Linux-Mobile/main/termo-modules.sh -o /usr/local/bin/termo-modules && chmod +x /usr/local/bin/termo-modules" > /dev/null 2>&1
 
 sleep 1
