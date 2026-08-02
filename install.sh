@@ -103,18 +103,18 @@ proot-distro login debian -- bash -c "apt-get update -y && apt-get upgrade -y" >
 
 show_gui 3 $TOTAL_MODULES "desktop-environment (GUI base)" "Installing TermoOS"
 if [ "$DE_CHOICE" == "3" ]; then
-    proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install xfce4 xfce4-goodies -y" > /dev/null 2>&1
+    proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install -yq -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" xfce4 xfce4-goodies" > /dev/null 2>&1
 elif [ "$DE_CHOICE" == "5" ]; then
-    proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install openbox obconf -y" > /dev/null 2>&1
+    proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install -yq -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" openbox obconf" > /dev/null 2>&1
 else
-    proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install xfce4 xfce4-goodies -y" > /dev/null 2>&1
+    proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install -yq -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" xfce4 xfce4-goodies" > /dev/null 2>&1
 fi
 
 show_gui 4 $TOTAL_MODULES "tigervnc (remote display)" "Installing TermoOS"
-proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install tigervnc-standalone-server dbus-x11 -y" > /dev/null 2>&1
+proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install -yq -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" tigervnc-standalone-server dbus-x11" > /dev/null 2>&1
 
 show_gui 5 $TOTAL_MODULES "firefox & wget (extras)" "Installing TermoOS"
-proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install firefox-esr nano dialog curl wget sudo -y" > /dev/null 2>&1
+proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install -yq -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" firefox-esr nano dialog curl wget sudo" > /dev/null 2>&1
 
 show_gui 6 $TOTAL_MODULES "vnc-config (startup scripts)" "Installing TermoOS"
 
