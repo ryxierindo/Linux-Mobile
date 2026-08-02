@@ -573,14 +573,4 @@ chmod +x /root/stop.sh
   else
     echo -e "${G}${B}║  App    : AVNC                           ║${N}"
   fi
-  echo -e "${G}${B}║  Host   : 127.0.0.1                      ║${N}"
-  echo -e "${G}${B}║  Port   : $PORT                              ║${N}"
-  echo -e "${G}${B}║  Pass   : $PASS                              ${N}"
-  echo -e "${G}${B}╚══════════════════════════════════════════╝${N}"
-  echo ""
-  echo -e "${Y}Starting desktop now...${N}\n"
-
-  proot-distro login "$PD" --user root -- bash /root/start.sh
-}
-
-main_menu
+  echo -e "${G}${B}
