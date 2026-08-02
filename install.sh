@@ -69,7 +69,13 @@ TYPE_CHOICE=$(dialog --clear --backtitle "TermoOS Setup" --title "Installation T
 "Minimal" "Only base OS and DE to run (Fastest)" \
 3>&1 1>&2 2>&3)
 
-USER_NAME=$(dialog --clear --backtitle "TermoOS Setup" --title "User Setup" --inputbox "Enter a new username for TermoOS:" 8 40 3>&1 1>&2 2>&3)
+# Hostname setup (Optional, placed right after Installation Type)
+USER_HOSTNAME=$(dialog --clear --backtitle "TermoOS Setup" --title "Hostname Setup" --inputbox "Enter custom Hostname (Optional):\n(Leave blank to default to 'localhost')" 9 45 3>&1 1>&2 2>&3)
+if [ -z "$USER_HOSTNAME" ]; then
+    USER_HOSTNAME="localhost"
+fi
+
+USER_NAME=$(dialog --clear --backtitle "TermoOS Setup" --title "User Setup" --inputbox "Enter Username (root username grants you sudo / root access):" 9 50 3>&1 1>&2 2>&3)
 USER_PASS=$(dialog --clear --backtitle "TermoOS Setup" --title "User Setup" --passwordbox "Enter a password for VNC/System:" 8 40 3>&1 1>&2 2>&3)
 
 dialog --clear --title "Ready" --yesno "Configuration complete. Begin installation?" 8 40
@@ -168,7 +174,7 @@ fi
 
 show_gui 6 $TOTAL_MODULES "vnc-config (startup scripts)" "Installing TermoOS" 1
 
-# Write System Configs & Automatic TermoOS Branding
+# Write System Configs & Hostname Settings
 proot-distro login debian -- bash -c "echo 'OS_TYPE=\"$TYPE_CHOICE\"' > /etc/termo-os.conf"
 proot-distro login debian -- bash -c "echo 'OS_DE=\"$DE_NAME\"' >> /etc/termo-os.conf"
 proot-distro login debian -- bash -c "echo 'VNC_TYPE=\"$VNC_APP_NAME\"' >> /etc/termo-os.conf"
@@ -176,6 +182,10 @@ proot-distro login debian -- bash -c "echo 'VNC_USER=\"$USER_NAME\"' > /etc/term
 proot-distro login debian -- bash -c "echo 'VNC_PORT=\"5901\"' >> /etc/termo-vnc.conf"
 proot-distro login debian -- bash -c "echo 'VNC_DISPLAY=\":1\"' >> /etc/termo-vnc.conf"
 proot-distro login debian -- bash -c "echo 'VNC_PASS=\"$USER_PASS\"' >> /etc/termo-vnc.conf"
+
+# Configure Hostname and Hosts file
+proot-distro login debian -- bash -c "echo '$USER_HOSTNAME' > /etc/hostname"
+proot-distro login debian -- bash -c "echo '127.0.0.1 localhost $USER_HOSTNAME' > /etc/hosts"
 
 # Automatic TermoOS Branding (`/etc/os-release`)
 cat << 'EOF' > os-release.tmp
@@ -237,7 +247,7 @@ source /etc/termo-vnc.conf
 vncserver -kill \$VNC_DISPLAY > /dev/null 2>&1
 pkill websockify > /dev/null 2>&1
 
-NEW_USER=\$(dialog --clear --title "VNC Setup" --inputbox "Enter new Username:" 8 40 "\$VNC_USER" 3>&1 1>&2 2>&3)
+NEW_USER=\$(dialog --clear --title "VNC Setup" --inputbox "Enter Username (root username grants you sudo / root access):" 9 50 "\$VNC_USER" 3>&1 1>&2 2>&3)
 NEW_PORT=\$(dialog --clear --title "VNC Setup" --inputbox "Enter new VNC Port (e.g. 5901, 5902):" 8 40 "\$VNC_PORT" 3>&1 1>&2 2>&3)
 NEW_PASS=\$(dialog --clear --title "VNC Setup" --passwordbox "Enter new VNC Password:" 8 40 3>&1 1>&2 2>&3)
 
@@ -262,7 +272,6 @@ EOF
 cat vnc-setup.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/vnc-setup && chmod +x /usr/local/bin/vnc-setup"
 rm vnc-setup.tmp
 
-# The master startup routine ('boot Termo', 'vnc', etc.)
 cat << EOF > boot-termo.tmp
 #!/bin/bash
 if [ "\$1" == "details" ]; then vnc-details; exit 0; fi
@@ -299,7 +308,6 @@ EOF
 cat boot-termo.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/boot-termo && chmod +x /usr/local/bin/boot-termo"
 proot-distro login debian -- bash -c "ln -sf /usr/local/bin/boot-termo /usr/local/bin/vnc"
 
-# Create a multi-word launcher wrapper so 'boot Termo' works out of the box
 cat << 'EOF' > boot-wrapper.tmp
 #!/bin/bash
 if [ "$1" == "Termo" ] || [ "$1" == "termo" ]; then
