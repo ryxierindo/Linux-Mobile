@@ -2,7 +2,7 @@
 
 # TermoOS Setup Script
 # Based on Debian via proot-distro
-# Hardened for VNC/PRoot Compatibility
+# Hardened for VNC/PRoot Compatibility (LXQt/GNOME/KDE Removed)
 
 export TERM=xterm-256color
 
@@ -37,44 +37,90 @@ fi
 
 dialog --backtitle "TermoOS Installation" --title "Welcome" --msgbox "Welcome to the TermoOS Setup!\n\nSystem will check your specs and guide you through the setup.\n\nHardware Profile:\nRAM: ${TOTAL_RAM}MB\nCORES: ${CORES}\n\nTIP: If arrows freeze, use NUMBER KEYS (1, 2, 3) to select options." 15 50
 
-DE_CHOICE=$(dialog --clear --backtitle "TermoOS Setup" --title "Desktop Environment" \
---menu "Choose an independent, PRoot-safe graphical environment:" 15 60 3 \
-"1" "XFCE (Full Desktop - Stable & Recommended)" \
-"2" "Openbox (Lightweight Window Manager)" \
-"3" "CLI Only (Minimal Xterm Interface)" \
-3>&1 1>&2 2>&3)
-
-CONN_CHOICE=$(dialog --clear --backtitle "TermoOS Setup" --title "Remote Protocol" \
---menu "Press a NUMBER to select connection type:" 12 55 3 \
-"1" "VNC (Graphical Desktop)" \
-"2" "RDP (Windows Remote Desktop)" \
-"3" "VPS (SSH only, No GUI)" \
-3>&1 1>&2 2>&3)
-
-if [ "$CONN_CHOICE" == "1" ]; then
-    VNC_TYPE_CHOICE=$(dialog --clear --backtitle "TermoOS Setup" --title "VNC Client Type" \
-    --menu "Press a NUMBER to select your preferred VNC client:" 12 55 2 \
-    "1" "NoVNC (Browser based, easy)" \
-    "2" "RealVNC / Standard (App based, faster)" \
-    3>&1 1>&2 2>&3)
-else
-    VNC_TYPE_CHOICE="0"
-fi
-
-TYPE_CHOICE=$(dialog --clear --backtitle "TermoOS Setup" --title "Installation Type" \
---menu "Select Installation Type\n(Auto-Recommended for your device: $REC_TYPE)" 15 60 3 \
-"Full" "All modules, heavy, longest install time" \
-"Simplified" "Necessary tools + Firefox (Medium)" \
-"Minimal" "Only base OS and DE to run (Fastest)" \
-3>&1 1>&2 2>&3)
-
-USER_NAME=$(dialog --clear --backtitle "TermoOS Setup" --title "User Setup" --inputbox "Enter a new username for TermoOS:" 8 40 3>&1 1>&2 2>&3)
-USER_PASS=$(dialog --clear --backtitle "TermoOS Setup" --title "User Setup" --passwordbox "Enter a password for VNC/System:" 8 40 3>&1 1>&2 2>&3)
-
-dialog --clear --title "Ready" --yesno "Configuration complete. Begin installation?" 8 40
-if [ $? -ne 0 ]; then
-    clear; echo "Installation aborted."; exit;
-fi
+# ==========================================
+# SETUP WIZARD (With Back Button Logic)
+# ==========================================
+STEP=1
+while [ $STEP -le 7 ]; do
+    case $STEP in
+        1)
+            DE_CHOICE=$(dialog --clear --cancel-label "Exit" --backtitle "TermoOS Setup" --title "Desktop Environment" \
+            --menu "Choose an independent, PRoot-safe graphical environment:" 15 60 3 \
+            "1" "XFCE (Full Desktop - Stable & Recommended)" \
+            "2" "Openbox (Lightweight Window Manager)" \
+            "3" "CLI Only (Minimal Xterm Interface)" \
+            3>&1 1>&2 2>&3)
+            
+            if [ $? -ne 0 ]; then clear; echo "Installation aborted."; exit 0; fi
+            ((STEP++))
+            ;;
+        2)
+            CONN_CHOICE=$(dialog --clear --cancel-label "Back" --backtitle "TermoOS Setup" --title "Remote Protocol" \
+            --menu "Press a NUMBER to select connection type:" 12 55 3 \
+            "1" "VNC (Graphical Desktop)" \
+            "2" "RDP (Windows Remote Desktop)" \
+            "3" "VPS (SSH only, No GUI)" \
+            3>&1 1>&2 2>&3)
+            
+            if [ $? -ne 0 ]; then ((STEP--)); continue; fi
+            ((STEP++))
+            ;;
+        3)
+            if [ "$CONN_CHOICE" == "1" ]; then
+                VNC_TYPE_CHOICE=$(dialog --clear --cancel-label "Back" --backtitle "TermoOS Setup" --title "VNC Client Type" \
+                --menu "Press a NUMBER to select your preferred VNC client:" 12 55 2 \
+                "1" "NoVNC (Browser based, easy)" \
+                "2" "RealVNC / Standard (App based, faster)" \
+                3>&1 1>&2 2>&3)
+                
+                if [ $? -ne 0 ]; then ((STEP--)); continue; fi
+            else
+                VNC_TYPE_CHOICE="0"
+            fi
+            ((STEP++))
+            ;;
+        4)
+            TYPE_CHOICE=$(dialog --clear --cancel-label "Back" --backtitle "TermoOS Setup" --title "Installation Type" \
+            --menu "Select Installation Type\n(Auto-Recommended for your device: $REC_TYPE)" 15 60 3 \
+            "Full" "All modules, heavy, longest install time" \
+            "Simplified" "Necessary tools + Firefox (Medium)" \
+            "Minimal" "Only base OS and DE to run (Fastest)" \
+            3>&1 1>&2 2>&3)
+            
+            if [ $? -ne 0 ]; then ((STEP--)); continue; fi
+            ((STEP++))
+            ;;
+        5)
+            USER_HOSTNAME=$(dialog --clear --cancel-label "Back" --backtitle "TermoOS Setup" --title "Hostname Setup" \
+            --inputbox "Enter custom Hostname (Optional):\n(Leave blank to default to 'localhost')" 9 45 3>&1 1>&2 2>&3)
+            
+            if [ $? -ne 0 ]; then ((STEP--)); continue; fi
+            if [ -z "$USER_HOSTNAME" ]; then USER_HOSTNAME="localhost"; fi
+            ((STEP++))
+            ;;
+        6)
+            USER_NAME=$(dialog --clear --cancel-label "Back" --backtitle "TermoOS Setup" --title "User Setup" \
+            --inputbox "Enter a new username for TermoOS:" 8 40 3>&1 1>&2 2>&3)
+            
+            if [ $? -ne 0 ]; then ((STEP--)); continue; fi
+            ((STEP++))
+            ;;
+        7)
+            USER_PASS=$(dialog --clear --cancel-label "Back" --backtitle "TermoOS Setup" --title "User Setup" \
+            --passwordbox "Enter a password for VNC/System:" 8 40 3>&1 1>&2 2>&3)
+            
+            if [ $? -ne 0 ]; then ((STEP--)); continue; fi
+            
+            dialog --clear --cancel-label "Back" --title "Ready" --yesno "Configuration complete. Begin installation?" 8 40
+            if [ $? -ne 0 ]; then 
+                ((STEP--))
+                continue
+            else 
+                break
+            fi
+            ;;
+    esac
+done
 
 # ==========================================
 # Map the DE & Protocol Names for the OS Config
@@ -170,6 +216,10 @@ proot-distro login debian -- bash -c "echo 'VNC_USER=\"$USER_NAME\"' > /etc/term
 proot-distro login debian -- bash -c "echo 'VNC_PORT=\"5901\"' >> /etc/termo-vnc.conf"
 proot-distro login debian -- bash -c "echo 'VNC_DISPLAY=\":1\"' >> /etc/termo-vnc.conf"
 proot-distro login debian -- bash -c "echo 'VNC_PASS=\"$USER_PASS\"' >> /etc/termo-vnc.conf"
+
+# Configure Hostname
+proot-distro login debian -- bash -c "echo '$USER_HOSTNAME' > /etc/hostname"
+proot-distro login debian -- bash -c "echo '127.0.0.1 localhost $USER_HOSTNAME' > /etc/hosts"
 
 # Automatic TermoOS Branding (`/etc/os-release`)
 cat << 'EOF' > os-release.tmp
