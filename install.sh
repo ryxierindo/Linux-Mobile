@@ -2,7 +2,7 @@
 
 # TermoOS Setup Script
 # Based on Debian via proot-distro
-# Hardened for VNC/PRoot Compatibility (LXQt/GNOME/KDE Removed)
+# Hardened for VNC/PRoot Compatibility
 
 export TERM=xterm-256color
 
@@ -192,9 +192,9 @@ fi
 
 show_gui 4 $TOTAL_MODULES "remote display protocols" "Installing TermoOS" 3
 if [ "$VNC_TYPE_CHOICE" == "1" ]; then
-    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tigervnc-standalone-server dbus-x11 novnc websockify" > /dev/null 2>&1
+    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tigervnc-standalone-server tigervnc-tools dbus-x11 novnc websockify" > /dev/null 2>&1
 else
-    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tigervnc-standalone-server dbus-x11" > /dev/null 2>&1
+    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tigervnc-standalone-server tigervnc-tools dbus-x11" > /dev/null 2>&1
 fi
 
 show_gui 5 $TOTAL_MODULES "extras (apps & tools)" "Installing TermoOS" 4
