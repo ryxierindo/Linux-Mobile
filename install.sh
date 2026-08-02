@@ -47,10 +47,20 @@ DE_CHOICE=$(dialog --clear --backtitle "TermoOS Setup" --title "Desktop Environm
 
 CONN_CHOICE=$(dialog --clear --backtitle "TermoOS Setup" --title "Remote Protocol" \
 --menu "Press a NUMBER to select connection type:" 12 55 3 \
-"1" "VNC (Default, Best for Android)" \
+"1" "VNC (Graphical Desktop)" \
 "2" "RDP (Windows Remote Desktop)" \
 "3" "VPS (SSH only, No GUI)" \
 3>&1 1>&2 2>&3)
+
+if [ "$CONN_CHOICE" == "1" ]; then
+    VNC_TYPE_CHOICE=$(dialog --clear --backtitle "TermoOS Setup" --title "VNC Client Type" \
+    --menu "Press a NUMBER to select your preferred VNC client:" 12 55 2 \
+    "1" "NoVNC (Browser based, easy)" \
+    "2" "RealVNC / Standard (App based, faster)" \
+    3>&1 1>&2 2>&3)
+else
+    VNC_TYPE_CHOICE="0"
+fi
 
 TYPE_CHOICE=$(dialog --clear --backtitle "TermoOS Setup" --title "Installation Type" \
 --menu "Select Installation Type\n(Auto-Recommended for your device: $REC_TYPE)" 15 60 3 \
@@ -68,13 +78,17 @@ if [ $? -ne 0 ]; then
 fi
 
 # ==========================================
-# Map the DE Name for the OS Config
+# Map the DE & Protocol Names for the OS Config
 # ==========================================
 DE_NAME="XFCE"
 if [ "$DE_CHOICE" == "1" ]; then DE_NAME="GNOME"; fi
 if [ "$DE_CHOICE" == "2" ]; then DE_NAME="KDE Plasma"; fi
 if [ "$DE_CHOICE" == "4" ]; then DE_NAME="LXQt"; fi
 if [ "$DE_CHOICE" == "5" ]; then DE_NAME="Openbox"; fi
+
+VNC_APP_NAME="None"
+if [ "$VNC_TYPE_CHOICE" == "1" ]; then VNC_APP_NAME="NoVNC"; fi
+if [ "$VNC_TYPE_CHOICE" == "2" ]; then VNC_APP_NAME="RealVNC"; fi
 
 # ==========================================
 # The Master GUI Progress Bar Function
@@ -136,8 +150,12 @@ elif [ "$DE_CHOICE" == "5" ]; then
     proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS openbox obconf" > /dev/null 2>&1
 fi
 
-show_gui 4 $TOTAL_MODULES "tigervnc (remote display)" "Installing TermoOS" 3
-proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tigervnc-standalone-server dbus-x11" > /dev/null 2>&1
+show_gui 4 $TOTAL_MODULES "remote display protocols" "Installing TermoOS" 3
+if [ "$VNC_TYPE_CHOICE" == "1" ]; then
+    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tigervnc-standalone-server dbus-x11 novnc websockify" > /dev/null 2>&1
+else
+    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tigervnc-standalone-server dbus-x11" > /dev/null 2>&1
+fi
 
 show_gui 5 $TOTAL_MODULES "extras (apps & tools)" "Installing TermoOS" 4
 if [ "$TYPE_CHOICE" == "Minimal" ]; then
@@ -150,15 +168,31 @@ fi
 
 show_gui 6 $TOTAL_MODULES "vnc-config (startup scripts)" "Installing TermoOS" 1
 
-# Write System Configs
+# Write System Configs & Automatic TermoOS Branding
 proot-distro login debian -- bash -c "echo 'OS_TYPE=\"$TYPE_CHOICE\"' > /etc/termo-os.conf"
 proot-distro login debian -- bash -c "echo 'OS_DE=\"$DE_NAME\"' >> /etc/termo-os.conf"
+proot-distro login debian -- bash -c "echo 'VNC_TYPE=\"$VNC_APP_NAME\"' >> /etc/termo-os.conf"
 proot-distro login debian -- bash -c "echo 'VNC_USER=\"$USER_NAME\"' > /etc/termo-vnc.conf"
 proot-distro login debian -- bash -c "echo 'VNC_PORT=\"5901\"' >> /etc/termo-vnc.conf"
 proot-distro login debian -- bash -c "echo 'VNC_DISPLAY=\":1\"' >> /etc/termo-vnc.conf"
 proot-distro login debian -- bash -c "echo 'VNC_PASS=\"$USER_PASS\"' >> /etc/termo-vnc.conf"
 
-# Generate xstartup to link VNC with the Desktop Environment
+# Automatic TermoOS Branding (`/etc/os-release`)
+cat << 'EOF' > os-release.tmp
+PRETTY_NAME="TermoOS (based on Debian)"
+NAME="TermoOS"
+VERSION_ID="1.0"
+VERSION="1.0"
+VERSION_CODENAME=trixie
+ID=debian
+ID_LIKE=debian
+HOME_URL="https://github.com/ryxierindo/Linux-Mobile"
+SUPPORT_URL="https://github.com/ryxierindo/Linux-Mobile/issues"
+BUG_REPORT_URL="https://github.com/ryxierindo/Linux-Mobile/issues"
+EOF
+cat os-release.tmp | proot-distro login debian -- bash -c "cat > /etc/os-release"
+rm os-release.tmp
+
 cat << EOF > xstartup.tmp
 #!/bin/bash
 xrdb \$HOME/.Xresources
@@ -177,13 +211,20 @@ rm xstartup.tmp
 cat << EOF > vnc-details.tmp
 #!/bin/bash
 source /etc/termo-vnc.conf
+source /etc/termo-os.conf
 echo '==========================='
-echo '   TermoOS VNC Details     '
+echo '   TermoOS Connection Info '
 echo '==========================='
-echo 'IP Address : 127.0.0.1'
-echo "Port       : \$VNC_PORT"
-echo "Username   : \$VNC_USER"
-echo "Password   : \$VNC_PASS"
+if [ "\$VNC_TYPE" == "NoVNC" ]; then
+    echo "Type       : Browser (NoVNC)"
+    echo "URL        : http://127.0.0.1:6080/vnc.html"
+    echo "Password   : \$VNC_PASS"
+else
+    echo 'IP Address : 127.0.0.1'
+    echo "Port       : \$VNC_PORT"
+    echo "Username   : \$VNC_USER"
+    echo "Password   : \$VNC_PASS"
+fi
 echo '==========================='
 EOF
 cat vnc-details.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/vnc-details && chmod +x /usr/local/bin/vnc-details"
@@ -192,6 +233,10 @@ rm vnc-details.tmp
 cat << EOF > vnc-setup.tmp
 #!/bin/bash
 source /etc/termo-vnc.conf
+
+vncserver -kill \$VNC_DISPLAY > /dev/null 2>&1
+pkill websockify > /dev/null 2>&1
+
 NEW_USER=\$(dialog --clear --title "VNC Setup" --inputbox "Enter new Username:" 8 40 "\$VNC_USER" 3>&1 1>&2 2>&3)
 NEW_PORT=\$(dialog --clear --title "VNC Setup" --inputbox "Enter new VNC Port (e.g. 5901, 5902):" 8 40 "\$VNC_PORT" 3>&1 1>&2 2>&3)
 NEW_PASS=\$(dialog --clear --title "VNC Setup" --passwordbox "Enter new VNC Password:" 8 40 3>&1 1>&2 2>&3)
@@ -212,32 +257,60 @@ echo "\$NEW_PASS" | vncpasswd -f > ~/.vnc/passwd
 chmod 600 ~/.vnc/passwd
 clear
 echo "VNC Configuration Updated Successfully!"
+echo "Run 'boot Termo' to restart the server with your new settings."
 EOF
 cat vnc-setup.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/vnc-setup && chmod +x /usr/local/bin/vnc-setup"
 rm vnc-setup.tmp
 
-cat << EOF > vnc.tmp
+# The master startup routine ('boot Termo', 'vnc', etc.)
+cat << EOF > boot-termo.tmp
 #!/bin/bash
 if [ "\$1" == "details" ]; then vnc-details; exit 0; fi
 if [ "\$1" == "setup" ]; then vnc-setup; exit 0; fi
 
 source /etc/termo-vnc.conf
+source /etc/termo-os.conf
 $GUI_ENGINE
 
 show_gui 1 3 "cleaning old sessions" "TermoOS Startup" 1
 vncserver -kill \$VNC_DISPLAY > /dev/null 2>&1
+pkill websockify > /dev/null 2>&1
 sleep 1
+
 show_gui 2 3 "launching graphical desktop" "TermoOS Startup" 1
-vncserver -geometry 1280x720 -depth 24 \$VNC_DISPLAY > /dev/null 2>&1
+vncserver \$VNC_DISPLAY -geometry 1280x720 -depth 24 -localhost no -SecurityTypes VncAuth,None > /dev/null 2>&1
 sleep 1
+
 show_gui 3 3 "finalizing setup" "TermoOS Startup" 1
+if [ "\$VNC_TYPE" == "NoVNC" ]; then
+    websockify -D --web=/usr/share/novnc/ 6080 localhost:\$VNC_PORT > /dev/null 2>&1
+fi
 sleep 1
+
 clear
-echo "VNC Server started successfully on port \$VNC_PORT!"
-echo "Type 'vnc details' to view login info, or 'vnc setup' to change it."
+if [ "\$VNC_TYPE" == "NoVNC" ]; then
+    echo "NoVNC Server started successfully!"
+    echo "Open your mobile browser and go to: http://127.0.0.1:6080/vnc.html"
+else
+    echo "TermoOS Desktop started successfully on port \$VNC_PORT!"
+    echo "Type 'boot Termo details' to view login info, or 'boot Termo setup' to change it."
+fi
 EOF
-cat vnc.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/vnc && chmod +x /usr/local/bin/vnc"
-rm vnc.tmp
+cat boot-termo.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/boot-termo && chmod +x /usr/local/bin/boot-termo"
+proot-distro login debian -- bash -c "ln -sf /usr/local/bin/boot-termo /usr/local/bin/vnc"
+
+# Create a multi-word launcher wrapper so 'boot Termo' works out of the box
+cat << 'EOF' > boot-wrapper.tmp
+#!/bin/bash
+if [ "$1" == "Termo" ] || [ "$1" == "termo" ]; then
+    shift
+    boot-termo "$@"
+else
+    boot-termo "$@"
+fi
+EOF
+cat boot-wrapper.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/boot && chmod +x /usr/local/bin/boot"
+rm boot-termo.tmp boot-wrapper.tmp
 
 proot-distro login debian -- bash -c "mkdir -p ~/.vnc && echo '$USER_PASS' | vncpasswd -f > ~/.vnc/passwd && chmod 600 ~/.vnc/passwd" > /dev/null 2>&1
 
@@ -305,12 +378,10 @@ clear
 echo -e "\n\nSuccess! TermoOS is installed."
 echo "----------------------------------------"
 echo "To enter TermoOS, type: proot-distro login debian"
-echo "Inside TermoOS, you can use these commands:"
-echo " - vnc          (Starts desktop)"
-echo " - vnc details  (Shows login info)"
-echo " - vnc setup    (Changes port/username/password)"
-echo " - termo-update (Terminal Updater)"
-echo " - termo-modules(Installs extra apps)"
-echo ""
-echo "Note: Double-click 'Updates' on your graphical desktop to update from inside the OS!"
+echo "Inside TermoOS, your startup commands are:"
+echo " - boot Termo          (Starts desktop with GUI loading bar)"
+echo " - boot Termo details  (Shows login info)"
+echo " - boot Termo setup    (Changes port/username/password)"
+echo " - termo-update        (Terminal Updater)"
+echo " - termo-modules       (Installs extra apps)"
 echo "----------------------------------------"
