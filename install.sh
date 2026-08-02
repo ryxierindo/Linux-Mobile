@@ -7,7 +7,6 @@ export TERM=xterm-256color
 
 echo "Checking required Termux packages..."
 
-# Fast Dependency Check
 if ! command -v dialog &> /dev/null || ! command -v proot-distro &> /dev/null; then
     echo "First-time setup: Downloading dependencies..."
     pkg update -y -o Dpkg::Options::="--force-confold"
@@ -26,7 +25,6 @@ else
     REC_TYPE="Full"
 fi
 
-# Setup Wizard UI
 dialog --backtitle "TermoOS Installation" --title "Welcome" --msgbox "Welcome to the TermoOS Setup!\n\nSystem will check your specs and guide you through the setup.\n\nTIP: If arrows freeze, use NUMBER KEYS (1, 2, 3) to select options." 12 50
 
 DE_CHOICE=$(dialog --clear --backtitle "TermoOS Setup" --title "Desktop Environment" \
@@ -61,7 +59,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # ==========================================
-# The Master GUI Progress Bar Function (Blue Screen)
+# The Master GUI Progress Bar Function
 # ==========================================
 GUI_ENGINE=$(cat << 'EOF_ENGINE'
 START_TIME=$(date +%s)
@@ -81,7 +79,6 @@ show_gui() {
         ETA_MINS=$((ETA_SECS / 60))
     fi
 
-    # The Blue Screen GUI Progress Bar
     echo "$PERCENT" | dialog --title "$TITLE" --backtitle "TermoOS Setup" \
     --gauge "Module $STEP/$TOTAL: $DESC\n\nEST : $ETA_MINS min     ELAPSED : $ELAPSED_MINS min" 10 45
 }
@@ -91,40 +88,46 @@ EOF_ENGINE
 eval "$GUI_ENGINE"
 
 # ==========================================
-# Installation Logic
+# Optimized Installation Logic
 # ==========================================
 TOTAL_MODULES=8
 
-show_gui 1 $TOTAL_MODULES "proot (linux base)" "Installing TermoOS"
+# These variables force maximum speed, remove bloatware, and block all interactive prompts
+ENV_VARS="export DEBIAN_FRONTEND=noninteractive; export DEBCONF_NONINTERACTIVE_SEEN=true"
+APT_OPTS="-yq --no-install-recommends -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" -o Dpkg::Options::=\"--force-unsafe-io\""
+
+show_gui 1 $TOTAL_MODULES "proot (linux base)\nFast step..." "Installing TermoOS"
 proot-distro install debian > /dev/null 2>&1
 
-show_gui 2 $TOTAL_MODULES "apt-get (system updates)" "Installing TermoOS"
-proot-distro login debian -- bash -c "apt-get update -y && apt-get upgrade -y" > /dev/null 2>&1
+show_gui 2 $TOTAL_MODULES "apt-get (system updates)\nFast step..." "Installing TermoOS"
+proot-distro login debian -- bash -c "$ENV_VARS; apt-get update -y && apt-get upgrade $APT_OPTS" > /dev/null 2>&1
 
-show_gui 3 $TOTAL_MODULES "desktop-environment (GUI base)" "Installing TermoOS"
-if [ "$DE_CHOICE" == "3" ]; then
-    proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install -yq -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" xfce4 xfce4-goodies" > /dev/null 2>&1
+show_gui 3 $TOTAL_MODULES "desktop-environment\nDOWNLOADING MASSIVE FILES. DO NOT CLOSE!\nTimer will not move until finished." "Installing TermoOS"
+if [ "$DE_CHOICE" == "1" ]; then
+    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS gnome-core" > /dev/null 2>&1
+elif [ "$DE_CHOICE" == "2" ]; then
+    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS kde-plasma-desktop" > /dev/null 2>&1
+elif [ "$DE_CHOICE" == "3" ]; then
+    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS xfce4 xfce4-goodies" > /dev/null 2>&1
+elif [ "$DE_CHOICE" == "4" ]; then
+    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS lxqt-core lxterminal" > /dev/null 2>&1
 elif [ "$DE_CHOICE" == "5" ]; then
-    proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install -yq -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" openbox obconf" > /dev/null 2>&1
-else
-    proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install -yq -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" xfce4 xfce4-goodies" > /dev/null 2>&1
+    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS openbox obconf" > /dev/null 2>&1
 fi
 
-show_gui 4 $TOTAL_MODULES "tigervnc (remote display)" "Installing TermoOS"
-proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install -yq -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" tigervnc-standalone-server dbus-x11" > /dev/null 2>&1
+show_gui 4 $TOTAL_MODULES "tigervnc (remote display)\nFast step..." "Installing TermoOS"
+proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tigervnc-standalone-server dbus-x11" > /dev/null 2>&1
 
-show_gui 5 $TOTAL_MODULES "firefox & wget (extras)" "Installing TermoOS"
-proot-distro login debian -- bash -c "DEBIAN_FRONTEND=noninteractive apt-get install -yq -o Dpkg::Options::=\"--force-confdef\" -o Dpkg::Options::=\"--force-confold\" firefox-esr nano dialog curl wget sudo" > /dev/null 2>&1
+show_gui 5 $TOTAL_MODULES "firefox & wget (extras)\nMedium step..." "Installing TermoOS"
+proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS firefox-esr nano dialog curl wget sudo" > /dev/null 2>&1
 
-show_gui 6 $TOTAL_MODULES "vnc-config (startup scripts)" "Installing TermoOS"
+show_gui 6 $TOTAL_MODULES "vnc-config (startup scripts)\nFast step..." "Installing TermoOS"
 
-# Write Initial VNC Config
 proot-distro login debian -- bash -c "echo 'VNC_USER=\"$USER_NAME\"' > /etc/termo-vnc.conf"
 proot-distro login debian -- bash -c "echo 'VNC_PORT=\"5901\"' >> /etc/termo-vnc.conf"
 proot-distro login debian -- bash -c "echo 'VNC_DISPLAY=\":1\"' >> /etc/termo-vnc.conf"
 proot-distro login debian -- bash -c "echo 'VNC_PASS=\"$USER_PASS\"' >> /etc/termo-vnc.conf"
 
-# Inject 'vnc-details' command
 cat << EOF > vnc-details.tmp
 #!/bin/bash
 source /etc/termo-vnc.conf
@@ -140,7 +143,6 @@ EOF
 cat vnc-details.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/vnc-details && chmod +x /usr/local/bin/vnc-details"
 rm vnc-details.tmp
 
-# Inject 'vnc-setup' command
 cat << EOF > vnc-setup.tmp
 #!/bin/bash
 source /etc/termo-vnc.conf
@@ -170,7 +172,6 @@ EOF
 cat vnc-setup.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/vnc-setup && chmod +x /usr/local/bin/vnc-setup"
 rm vnc-setup.tmp
 
-# Inject 'vnc' master command (Now uses the blue GUI engine)
 cat << EOF > vnc.tmp
 #!/bin/bash
 if [ "\$1" == "details" ]; then vnc-details; exit 0; fi
@@ -194,12 +195,10 @@ EOF
 cat vnc.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/vnc && chmod +x /usr/local/bin/vnc"
 rm vnc.tmp
 
-# Set the initial VNC password
 proot-distro login debian -- bash -c "mkdir -p ~/.vnc && echo '$USER_PASS' | vncpasswd -f > ~/.vnc/passwd && chmod 600 ~/.vnc/passwd" > /dev/null 2>&1
 
-show_gui 7 $TOTAL_MODULES "termo-update (updater module)" "Installing TermoOS"
+show_gui 7 $TOTAL_MODULES "termo-update (updater module)\nFast step..." "Installing TermoOS"
 
-# Inject UPDATE command (Now uses the blue GUI engine)
 cat << EOF > termo-update.tmp
 #!/bin/bash
 $GUI_ENGINE
@@ -216,13 +215,12 @@ EOF
 cat termo-update.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/termo-update && chmod +x /usr/local/bin/termo-update"
 rm termo-update.tmp
 
-show_gui 8 $TOTAL_MODULES "termo-modules (app store)" "Installing TermoOS"
+show_gui 8 $TOTAL_MODULES "termo-modules (app store)\nFinalizing..." "Installing TermoOS"
 proot-distro login debian -- bash -c "curl -s https://raw.githubusercontent.com/ryxierindo/Linux-Mobile/main/termo-modules.sh -o /usr/local/bin/termo-modules && chmod +x /usr/local/bin/termo-modules" > /dev/null 2>&1
 
 sleep 1
 clear
 
-# Final Success Message
 echo -e "\n\nSuccess! TermoOS is installed."
 echo "----------------------------------------"
 echo "To enter TermoOS, type: proot-distro login debian"
