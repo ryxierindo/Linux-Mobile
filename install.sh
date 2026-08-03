@@ -28,29 +28,25 @@ CORES=$(nproc 2>/dev/null || echo 4)
 SPEED_FACTOR=1.0
 if [ "$TOTAL_RAM" -lt 4000 ]; then
     SPEED_FACTOR=2.0
-    REC_TYPE="Minimal"
-elif [ "$TOTAL_RAM" -lt 6000 ]; then
-    SPEED_FACTOR=1.5
-    REC_TYPE="Simplified"
+    REC_TYPE="TXDE Basic"
 else
     SPEED_FACTOR=1.0
-    REC_TYPE="Full"
+    REC_TYPE="TXDE Full"
 fi
 
-dialog --backtitle "TermoOS Installation" --title "Welcome" --msgbox "Welcome to the TermoOS Setup!\n\nSystem will check your specs and guide you through the setup.\n\nHardware Profile:\nRAM: ${TOTAL_RAM}MB\nCORES: ${CORES}\n\nTIP: If arrows freeze, use NUMBER KEYS (1, 2, 3) to select options." 15 50
+dialog --backtitle "TermoOS Installation" --title "Welcome" --msgbox "Welcome to the TermoOS Setup!\n\nSystem will check your specs and guide you through the setup.\n\nHardware Profile:\nRAM: ${TOTAL_RAM}MB\nCORES: ${CORES}\n\nTIP: If arrows freeze, use NUMBER KEYS (1, 2) to select options." 15 50
 
 # ==========================================
 # SETUP WIZARD (With Back Button Logic)
 # ==========================================
 STEP=1
-while [ $STEP -le 7 ]; do
+while [ $STEP -le 6 ]; do
     case $STEP in
         1)
-            DE_CHOICE=$(dialog --clear --cancel-label "Exit" --backtitle "TermoOS Setup" --title "Desktop Environment" \
-            --menu "Choose an independent, PRoot-safe graphical environment:" 15 65 3 \
-            "1" "TxDE (Custom TermoOS Environment - Bug Free & Recommended)" \
-            "2" "XFCE (Legacy Full Desktop - May cause fd crash bug)" \
-            "3" "CLI Only (Minimal Xterm Interface)" \
+            TYPE_CHOICE=$(dialog --clear --cancel-label "Exit" --backtitle "TermoOS Setup" --title "TermoOS Edition" \
+            --menu "Select your TermoOS Edition\n(Auto-Recommended for your device: $REC_TYPE)" 15 65 2 \
+            "Full" "TXDE Full (App Store, Firefox, Recycle Bin)" \
+            "Basic" "TXDE Basic (Core features, fast & minimal)" \
             3>&1 1>&2 2>&3)
             
             if [ $? -ne 0 ]; then clear; echo "Installation aborted."; exit 0; fi
@@ -82,17 +78,6 @@ while [ $STEP -le 7 ]; do
             ((STEP++))
             ;;
         4)
-            TYPE_CHOICE=$(dialog --clear --cancel-label "Back" --backtitle "TermoOS Setup" --title "Installation Type" \
-            --menu "Select Installation Type\n(Auto-Recommended for your device: $REC_TYPE)" 15 65 3 \
-            "Full" "All modules + App Store, Firefox, Recycle Bin" \
-            "Simplified" "Standard UI + Settings, Features App" \
-            "Minimal" "Only base OS and TxDE core to run (Fastest)" \
-            3>&1 1>&2 2>&3)
-            
-            if [ $? -ne 0 ]; then ((STEP--)); continue; fi
-            ((STEP++))
-            ;;
-        5)
             USER_HOSTNAME=$(dialog --clear --cancel-label "Back" --backtitle "TermoOS Setup" --title "Hostname Setup" \
             --inputbox "Enter custom Hostname (Optional):\n(Leave blank to default to 'localhost')" 9 45 3>&1 1>&2 2>&3)
             
@@ -100,14 +85,14 @@ while [ $STEP -le 7 ]; do
             if [ -z "$USER_HOSTNAME" ]; then USER_HOSTNAME="localhost"; fi
             ((STEP++))
             ;;
-        6)
+        5)
             USER_NAME=$(dialog --clear --cancel-label "Back" --backtitle "TermoOS Setup" --title "User Setup" \
             --inputbox "Enter a new username for TermoOS:" 8 40 3>&1 1>&2 2>&3)
             
             if [ $? -ne 0 ]; then ((STEP--)); continue; fi
             ((STEP++))
             ;;
-        7)
+        6)
             USER_PASS=$(dialog --clear --cancel-label "Back" --backtitle "TermoOS Setup" --title "User Setup" \
             --passwordbox "Enter a password for VNC/System:" 8 40 3>&1 1>&2 2>&3)
             
@@ -124,14 +109,7 @@ while [ $STEP -le 7 ]; do
     esac
 done
 
-# ==========================================
-# Map the DE & Protocol Names for the OS Config
-# ==========================================
 DE_NAME="TxDE"
-if [ "$DE_CHOICE" == "1" ]; then DE_NAME="TxDE"; fi
-if [ "$DE_CHOICE" == "2" ]; then DE_NAME="XFCE"; fi
-if [ "$DE_CHOICE" == "3" ]; then DE_NAME="CLI"; fi
-
 VNC_APP_NAME="None"
 if [ "$VNC_TYPE_CHOICE" == "1" ]; then VNC_APP_NAME="NoVNC"; fi
 if [ "$VNC_TYPE_CHOICE" == "2" ]; then VNC_APP_NAME="RealVNC"; fi
@@ -183,15 +161,8 @@ proot-distro install debian > /dev/null 2>&1
 show_gui 2 $TOTAL_MODULES "apt-get (system updates)" "Installing TermoOS" 3
 proot-distro login debian -- bash -c "$ENV_VARS; apt-get update -y && apt-get upgrade $APT_OPTS" > /dev/null 2>&1
 
-show_gui 3 $TOTAL_MODULES "desktop-environment\n(Extracting files, DO NOT CLOSE)" "Installing TermoOS" 10
-if [ "$DE_CHOICE" == "1" ]; then
-    # TxDE Installation
-    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS openbox tint2 pcmanfm xterm whiptail x11-xserver-utils trash-cli" > /dev/null 2>&1
-elif [ "$DE_CHOICE" == "2" ]; then
-    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS xfce4 xfce4-goodies" > /dev/null 2>&1
-elif [ "$DE_CHOICE" == "3" ]; then
-    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS xterm fonts-dejavu" > /dev/null 2>&1
-fi
+show_gui 3 $TOTAL_MODULES "txde-engine\n(Extracting TxDE, DO NOT CLOSE)" "Installing TermoOS" 8
+proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS openbox tint2 pcmanfm xterm whiptail x11-xserver-utils trash-cli" > /dev/null 2>&1
 
 show_gui 4 $TOTAL_MODULES "remote display protocols" "Installing TermoOS" 3
 if [ "$VNC_TYPE_CHOICE" == "1" ]; then
@@ -201,22 +172,19 @@ else
 fi
 
 show_gui 5 $TOTAL_MODULES "extras (apps & tools)" "Installing TermoOS" 4
-if [ "$TYPE_CHOICE" == "Minimal" ]; then
-    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS nano dialog curl sudo xterm" > /dev/null 2>&1
-elif [ "$TYPE_CHOICE" == "Simplified" ]; then
+if [ "$TYPE_CHOICE" == "Basic" ]; then
     proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS nano dialog curl sudo xterm" > /dev/null 2>&1
 else
     proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS firefox-esr wget nano dialog curl sudo xterm htop neofetch" > /dev/null 2>&1
 fi
 
 # ==========================================
-# TxDE System Apps Configuration (If TxDE selected)
+# TxDE System Apps Configuration
 # ==========================================
-if [ "$DE_NAME" == "TxDE" ]; then
-    proot-distro login debian -- bash -c "mkdir -p /root/Desktop /root/.config/tint2"
-    
-    # 1. Windows Style Taskbar
-    cat << 'EOF' > tint2rc.tmp
+proot-distro login debian -- bash -c "mkdir -p /root/Desktop /root/.config/tint2"
+
+# 1. Windows Style Taskbar
+cat << 'EOF' > tint2rc.tmp
 panel_items = L:T:B:S
 panel_position = bottom center horizontal
 panel_size = 100% 40px
@@ -236,11 +204,11 @@ time2_format = %d-%m-%Y
 systray_padding = 4
 systray_sort = ascending
 EOF
-    cat tint2rc.tmp | proot-distro login debian -- bash -c "cat > /root/.config/tint2/tint2rc"
-    rm tint2rc.tmp
+cat tint2rc.tmp | proot-distro login debian -- bash -c "cat > /root/.config/tint2/tint2rc"
+rm tint2rc.tmp
 
-    # 2. TxDE Features App Generator
-    cat << 'EOF' > txde-features.tmp
+# 2. TxDE Features App Generator
+cat << 'EOF' > txde-features.tmp
 #!/bin/bash
 export NEWT_COLORS='root=white,blue:window=white,blue:border=white,blue:button=white,blue'
 SHOW_PROGRESS() {
@@ -248,21 +216,21 @@ SHOW_PROGRESS() {
     (echo "$PERCENT"; sleep 0.5) | whiptail --title "$TITLE" --gauge "Processing: $STEP/$TOTAL\nPlease wait..." 8 50 $PERCENT
 }
 MAIN_MENU() {
-    if [ -f ~/Desktop/firefox.desktop ] || [ -f ~/Desktop/appstore.desktop ]; then CURRENT_MODE="Full DE"; else CURRENT_MODE="Minimal/Simplified DE"; fi
+    if [ -f ~/Desktop/firefox.desktop ] || [ -f ~/Desktop/appstore.desktop ]; then CURRENT_MODE="TXDE Full"; else CURRENT_MODE="TXDE Basic"; fi
     CHOICE=$(whiptail --title "TermoOS Features App" --menu "Current Mode: [$CURRENT_MODE]\nSelect option:" 16 65 5 \
-    "1" "Switch DE Mode (Full <-> Minimal)" "2" "Control Panel (Enable/Disable)" "3" "Firefox Browser (Enable/Disable)" "4" "App Store (Enable/Disable)" "5" "Exit" 3>&1 1>&2 2>&3)
+    "1" "Switch DE Mode (Full <-> Basic)" "2" "Control Panel (Enable/Disable)" "3" "Firefox Browser (Enable/Disable)" "4" "App Store (Enable/Disable)" "5" "Exit" 3>&1 1>&2 2>&3)
     case $CHOICE in
         1) SWITCH_DE_MODE ;; 2) TOGGLE_CONTROL_PANEL ;; 3) TOGGLE_FIREFOX ;; 4) TOGGLE_APPSTORE ;; 5) exit 0 ;;
     esac
 }
 SWITCH_DE_MODE() {
     if [ -f ~/Desktop/firefox.desktop ] || [ -f ~/Desktop/appstore.desktop ]; then
-        if whiptail --title "Switch Mode" --yesno "Switch to Minimal DE? (Removes App Store & Firefox shortcuts)" 10 60; then
-            SHOW_PROGRESS "Switching to Minimal DE" 0 2; rm -f ~/Desktop/appstore.desktop ~/Desktop/recycle-bin.desktop; SHOW_PROGRESS "Switching to Minimal DE" 1 2; rm -f ~/Desktop/firefox.desktop; SHOW_PROGRESS "Switching to Minimal DE" 2 2; whiptail --msgbox "Switched to Minimal DE!" 8 40
+        if whiptail --title "Switch Mode" --yesno "Switch to TXDE Basic? (Removes App Store & Firefox shortcuts)" 10 60; then
+            SHOW_PROGRESS "Switching to TXDE Basic" 0 2; rm -f ~/Desktop/appstore.desktop ~/Desktop/recycle-bin.desktop; SHOW_PROGRESS "Switching to TXDE Basic" 1 2; rm -f ~/Desktop/firefox.desktop; SHOW_PROGRESS "Switching to TXDE Basic" 2 2; whiptail --msgbox "Switched to TXDE Basic!" 8 40
         fi
     else
-        if whiptail --title "Switch Mode" --yesno "Switch to Full DE? (Installs App Store, Recycle Bin, Firefox)" 10 60; then
-            SHOW_PROGRESS "Switching to Full DE" 0 3
+        if whiptail --title "Switch Mode" --yesno "Switch to TXDE Full? (Installs App Store, Recycle Bin, Firefox)" 10 60; then
+            SHOW_PROGRESS "Switching to TXDE Full" 0 3
             cat << 'INNEREOF' > /usr/local/bin/txde-appstore
 #!/bin/bash
 APP=$(whiptail --title "App Store" --inputbox "Enter package name:" 10 50 3>&1 1>&2 2>&3)
@@ -278,7 +246,7 @@ Type=Application
 Terminal=false
 INNEREOF
             chmod +x ~/Desktop/appstore.desktop
-            SHOW_PROGRESS "Switching to Full DE" 1 3
+            SHOW_PROGRESS "Switching to TXDE Full" 1 3
             cat << 'INNEREOF' > ~/Desktop/recycle-bin.desktop
 [Desktop Entry]
 Name=Recycle Bin
@@ -288,7 +256,7 @@ Type=Application
 Terminal=false
 INNEREOF
             chmod +x ~/Desktop/recycle-bin.desktop
-            SHOW_PROGRESS "Switching to Full DE" 2 3
+            SHOW_PROGRESS "Switching to TXDE Full" 2 3
             apt-get install -y firefox-esr >/dev/null 2>&1
             cat << 'INNEREOF' > ~/Desktop/firefox.desktop
 [Desktop Entry]
@@ -299,8 +267,8 @@ Type=Application
 Terminal=false
 INNEREOF
             chmod +x ~/Desktop/firefox.desktop
-            SHOW_PROGRESS "Switching to Full DE" 3 3
-            whiptail --msgbox "Switched to Full DE!" 8 40
+            SHOW_PROGRESS "Switching to TXDE Full" 3 3
+            whiptail --msgbox "Switched to TXDE Full!" 8 40
         fi
     fi
     MAIN_MENU
@@ -335,11 +303,11 @@ TOGGLE_FIREFOX() { whiptail --msgbox "Use the Mode Switcher to handle Firefox." 
 TOGGLE_APPSTORE() { whiptail --msgbox "Use the Mode Switcher to handle the App Store." 8 50; MAIN_MENU; }
 MAIN_MENU
 EOF
-    cat txde-features.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/txde-features && chmod +x /usr/local/bin/txde-features"
-    rm txde-features.tmp
+cat txde-features.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/txde-features && chmod +x /usr/local/bin/txde-features"
+rm txde-features.tmp
 
-    # 3. Base Desktop Shortcuts
-    cat << 'EOF' > shortcuts.tmp
+# 3. Base Desktop Shortcuts
+cat << 'EOF' > shortcuts.tmp
 cat << 'INNEREOF' > /root/Desktop/mypc.desktop
 [Desktop Entry]
 Name=My PC
@@ -374,13 +342,13 @@ Terminal=false
 INNEREOF
 chmod +x /root/Desktop/*.desktop
 EOF
-    cat shortcuts.tmp | proot-distro login debian -- bash -c "bash"
-    rm shortcuts.tmp
-    
-    # 4. If Full Edition, trigger the Feature mode internally
-    if [ "$TYPE_CHOICE" == "Full" ]; then
-        proot-distro login debian -- bash -c "apt-get install -y firefox-esr >/dev/null 2>&1"
-        cat << 'EOF' > fullapps.tmp
+cat shortcuts.tmp | proot-distro login debian -- bash -c "bash"
+rm shortcuts.tmp
+
+# 4. If Full Edition, deploy the Full apps
+if [ "$TYPE_CHOICE" == "Full" ]; then
+    proot-distro login debian -- bash -c "apt-get install -y firefox-esr >/dev/null 2>&1"
+    cat << 'EOF' > fullapps.tmp
 cat << 'INNEREOF' > /usr/local/bin/txde-appstore
 #!/bin/bash
 APP=$(whiptail --title "App Store" --inputbox "Enter package name:" 10 50 3>&1 1>&2 2>&3)
@@ -413,9 +381,8 @@ Terminal=false
 INNEREOF
 chmod +x /root/Desktop/*.desktop
 EOF
-        cat fullapps.tmp | proot-distro login debian -- bash -c "bash"
-        rm fullapps.tmp
-    fi
+    cat fullapps.tmp | proot-distro login debian -- bash -c "bash"
+    rm fullapps.tmp
 fi
 
 show_gui 6 $TOTAL_MODULES "vnc-config (startup scripts)" "Installing TermoOS" 1
@@ -454,14 +421,11 @@ source /etc/termo-os.conf
 
 export XDG_SESSION_TYPE=x11
 
-if [ "\$OS_DE" == "TxDE" ]; then
-    xsetroot -solid "#0078d7" &
-    pcmanfm --desktop &
-    tint2 &
-    exec openbox-session
-fi
-if [ "\$OS_DE" == "XFCE" ]; then exec dbus-launch startxfce4; fi
-if [ "\$OS_DE" == "CLI" ]; then exec xterm -geometry 120x35 -fa 'Monospace' -fs 12 -bg black -fg white; fi
+# Start TxDE
+xsetroot -solid "#0078d7" &
+pcmanfm --desktop &
+tint2 &
+exec openbox-session
 EOF
 proot-distro login debian -- bash -c "mkdir -p ~/.vnc"
 cat xstartup.tmp | proot-distro login debian -- bash -c "cat > ~/.vnc/xstartup && chmod +x ~/.vnc/xstartup"
@@ -504,4 +468,55 @@ if [ -z "\$NEW_PASS" ] || [ -z "\$NEW_PORT" ]; then
     clear; echo "Setup cancelled."; exit 1
 fi
 
-DI
+DISPLAY_NUM=\$((\$NEW_PORT - 5900))
+if [ \$DISPLAY_NUM -lt 1 ]; then DISPLAY_NUM=1; NEW_PORT=5901; fi
+
+echo "VNC_USER=\"\$NEW_USER\"" > /etc/termo-vnc.conf
+echo "VNC_PORT=\"\$NEW_PORT\"" >> /etc/termo-vnc.conf
+echo "VNC_DISPLAY=\":\$DISPLAY_NUM\"" >> /etc/termo-vnc.conf
+echo "VNC_PASS=\"\$NEW_PASS\"" >> /etc/termo-vnc.conf
+
+echo "\$NEW_PASS" | vncpasswd -f > ~/.vnc/passwd
+chmod 600 ~/.vnc/passwd
+clear
+echo "VNC Configuration Updated Successfully!"
+echo "Run 'boot Termo' to restart the server with your new settings."
+EOF
+cat vnc-setup.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/vnc-setup && chmod +x /usr/local/bin/vnc-setup"
+rm vnc-setup.tmp
+
+# The master startup routine ('boot Termo', 'vnc', etc.)
+cat << EOF > boot-termo.tmp
+#!/bin/bash
+if [ "\$1" == "details" ]; then vnc-details; exit 0; fi
+if [ "\$1" == "setup" ]; then vnc-setup; exit 0; fi
+
+source /etc/termo-vnc.conf
+source /etc/termo-os.conf
+$GUI_ENGINE
+
+show_gui 1 3 "cleaning old sessions" "TermoOS Startup" 1
+vncserver -kill \$VNC_DISPLAY > /dev/null 2>&1
+pkill websockify > /dev/null 2>&1
+sleep 1
+
+show_gui 2 3 "launching graphical desktop" "TermoOS Startup" 1
+vncserver \$VNC_DISPLAY -geometry 1280x720 -depth 24 -localhost no -SecurityTypes VncAuth,None -extension MIT-SHM > /dev/null 2>&1
+sleep 1
+
+show_gui 3 3 "finalizing setup" "TermoOS Startup" 1
+if [ "\$VNC_TYPE" == "NoVNC" ]; then
+    websockify -D --web=/usr/share/novnc/ 6080 localhost:\$VNC_PORT > /dev/null 2>&1
+fi
+sleep 1
+
+clear
+if [ "\$VNC_TYPE" == "NoVNC" ]; then
+    echo "NoVNC Server started successfully!"
+    echo "Open your mobile browser and go to: http://127.0.0.1:6080/vnc.html"
+else
+    echo "TermoOS Desktop started successfully on port \$VNC_PORT!"
+    echo "Type 'boot Termo details' to view login info, or 'boot Termo setup' to change it."
+fi
+EOF
+cat boot-termo.tmp | proot-distro login debian -- bash -c "cat > /usr/local/bin/boot-termo && chmod +x /usr/l
