@@ -22,38 +22,6 @@ fi
 PD_ROOT="${PREFIX:-/data/data/com.termux/files/usr}/var/lib/proot-distro/installed-rootfs/debian"
 
 # ==========================================
-# MAIN MENU (Install or Remove Everything)
-# ==========================================
-MAIN_CHOICE=$(dialog --clear --cancel-label "Exit" --backtitle "TermoOS Management" --title "Main Menu" \
---menu "Welcome to the TermoOS Setup Engine\nSelect an action:" 12 60 2 \
-"1" "Install or Update TermoOS" \
-"2" "Remove Everything (Wipe Data/Configs, Keep OS)" \
-3>&1 1>&2 2>&3)
-
-if [ $? -ne 0 ]; then clear; exit 0; fi
-
-if [ "$MAIN_CHOICE" == "2" ]; then
-    dialog --title "Confirm Reset" --yesno "WARNING: This will permanently delete all TermoOS configurations, Desktop files, VNC settings, and passwords.\n\nThe base Debian OS will NOT be deleted.\n\nContinue?" 10 60
-    if [ $? -eq 0 ]; then
-        if [ -d "$PD_ROOT" ]; then
-            clear
-            echo "[+] Wiping TxDE configurations and user data..."
-            rm -rf "$PD_ROOT/root/Desktop" "$PD_ROOT/root/.config/tint2" "$PD_ROOT/root/.vnc" "$PD_ROOT/root/.config/tigervnc"
-            rm -f "$PD_ROOT/etc/termo-"* "$PD_ROOT/usr/local/bin/txde-"* "$PD_ROOT/usr/local/bin/vnc"* "$PD_ROOT/usr/local/bin/boot"* "$PD_ROOT/usr/local/bin/termo-"*
-            
-            echo "[+] Purging desktop packages (leaving base OS intact)..."
-            proot-distro login debian -- bash -c "export DEBIAN_FRONTEND=noninteractive; apt-get purge -y openbox tint2 pcmanfm xterm whiptail firefox-esr tigervnc-standalone-server tigervnc-tools novnc websockify && apt-get autoremove -y" > /dev/null 2>&1
-            
-            dialog --title "Success" --msgbox "Remove Everything complete!\n\nAll TxDE data and configs were deleted.\nYour base Debian OS remains untouched." 8 50
-        else
-            dialog --title "Error" --msgbox "TermoOS is not installed yet. Nothing to remove." 8 40
-        fi
-    fi
-    clear
-    exit 0
-fi
-
-# ==========================================
 # HARDWARE PROFILER
 # ==========================================
 TOTAL_RAM=$(free -m | awk '/^Mem:/{print $2}')
@@ -484,4 +452,53 @@ sleep 1
 clear
 if [ "$VNC_TYPE" == "NoVNC" ]; then
     echo "NoVNC Server started successfully!"
-    echo "Open your mobile browser and go to: http://127.0.0.1:
+    echo "Open your mobile browser and go to: http://127.0.0.1:6080/vnc.html"
+else
+    echo "TermoOS Desktop started successfully on port $VNC_PORT!"
+    echo "Type 'boot Termo details' to view login info, or 'boot Termo setup' to change it."
+fi
+EOF
+chmod +x "$PD_ROOT/usr/local/bin/boot-termo"
+
+ln -sf boot-termo "$PD_ROOT/usr/local/bin/vnc"
+
+cat << 'EOF' > "$PD_ROOT/usr/local/bin/boot"
+#!/bin/bash
+if [ "$1" == "Termo" ] || [ "$1" == "termo" ]; then shift; boot-termo "$@"; else boot-termo "$@"; fi
+EOF
+chmod +x "$PD_ROOT/usr/local/bin/boot"
+
+echo "$USER_PASS" > "$PD_ROOT/tmp/vncpass.txt"
+proot-distro login debian -- bash -c "mkdir -p ~/.config/tigervnc ~/.vnc && cat /tmp/vncpass.txt | vncpasswd -f > ~/.vnc/passwd && chmod 600 ~/.vnc/passwd && cp ~/.vnc/passwd ~/.config/tigervnc/passwd && chmod 600 ~/.config/tigervnc/passwd" > /dev/null 2>&1
+rm -f "$PD_ROOT/tmp/vncpass.txt"
+
+show_gui 7 $TOTAL_MODULES "termo-update (smart app)" "Installing TermoOS" 1
+
+# ==========================================
+# Windows-Style GUI Updater (termo-update)
+# ==========================================
+cat << 'EOF' > "$PD_ROOT/usr/local/bin/termo-update"
+#!/bin/bash
+export NEWT_COLORS='root=white,blue:window=white,blue:border=white,blue:button=white,blue'
+source /etc/termo-os.conf
+
+MAIN_MENU() {
+    CHOICE=$(whiptail --title "TermoOS Updater & Recovery" --menu "Windows-Style Update & Recovery\nCurrent Version: 1.0 (TxDE Edition)" 15 65 4 \
+    "1" "Check for updates" \
+    "2" "Reset the OS (Wipe Data/Configs, Keep Base)" \
+    "3" "Reinstall the OS (Factory Reset)" \
+    "4" "Exit" 3>&1 1>&2 2>&3)
+
+    case $CHOICE in
+        1) CHECK_UPDATES ;;
+        2) RESET_OS ;;
+        3) REINSTALL_OS ;;
+        4) exit 0 ;;
+        *) exit 0 ;;
+    esac
+}
+
+CHECK_UPDATES() {
+    {
+        echo "10"; apt-get update -y >/dev/null 2>&1
+        echo "50"; UPGRADES=$(apt-get -s upgrade | awk '/^Inst/
