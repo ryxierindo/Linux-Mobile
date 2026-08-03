@@ -13,4 +13,4 @@ A lightweight, modular, and fast Linux distribution built specifically for Andro
 Open Termux on your Android device and paste this single command:
 
 ```bash
-pkg install curl -y && bash <(curl -s [https://raw.githubusercontent.com/YourUsername/TermoOS/main/install.sh](https://raw.githubusercontent.com/ryxierindo/Linux-Mobile/main/install.sh))
+pkg install curl -y && bash <(curl -s [https://raw.githubusercontent.com/ryxierindo/Linux-Mobile/main/install.sh](https://raw.githubusercontent.com/ryxierindo/Linux-Mobile/main/install.sh))
