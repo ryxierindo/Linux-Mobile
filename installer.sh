@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==========================================
-# TermoOS Core Installer (The Ultimate Edition)
+# TermoOS Core Installer
 # ==========================================
 
 export TERM=xterm-256color
