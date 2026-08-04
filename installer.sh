@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==========================================
-# TermoOS Core Installer 
+# TermoOS Core Installer (The Ultimate Edition)
 # ==========================================
 
 export TERM=xterm-256color
@@ -13,41 +13,46 @@ PD_ROOT="${PREFIX:-/data/data/com.termux/files/usr}/var/lib/proot-distro/install
 
 START_TIME=$(date +%s)
 show_gui() {
-    local STEP=$1; local TOTAL=$2; local DESC=$3; local TITLE=$4
+    local STEP=$1; local TOTAL=$2; local DESC=$3; local TITLE=$4; local BASE_EST=$5
     local ELAPSED_MINS=$(( ($(date +%s) - START_TIME) / 60 ))
     local PERCENT=$((STEP * 100 / TOTAL))
+    
+    # Calculate Estimated Time based on the device's RAM speed factor
+    local PREDICTED_EST=$(echo "$BASE_EST * $SPEED_FACTOR" | bc | awk '{print int($1+0.5)}')
+    if [ -z "$PREDICTED_EST" ]; then PREDICTED_EST=$BASE_EST; fi
+
     echo "$PERCENT" | dialog --title "$TITLE" --backtitle "TermoOS Build Engine" \
-    --gauge "Module $STEP/$TOTAL: $DESC\n\nELAPSED : $ELAPSED_MINS min" 10 45
+    --gauge "Module $STEP/$TOTAL: $DESC\n\nEST: ~$PREDICTED_EST min     ELAPSED: $ELAPSED_MINS min" 10 50
 }
 
 TOTAL=8
 ENV_VARS="export PROOT_NO_WARNINGS=1; export DEBIAN_FRONTEND=noninteractive"
 APT_OPTS="-yq --no-install-recommends"
 
-show_gui 1 $TOTAL "Installing Linux Base" "TermoOS Build"
+show_gui 1 $TOTAL "Installing Linux Base" "TermoOS Build" 2
 proot-distro install debian > /dev/null 2>&1
 
-show_gui 2 $TOTAL "Configuring Timezone & Region" "TermoOS Build"
+show_gui 2 $TOTAL "Configuring Timezone & Region" "TermoOS Build" 1
 proot-distro login debian -- bash -c "$ENV_VARS; apt-get update -y; apt-get install -y tzdata; ln -sf /usr/share/zoneinfo/$USER_TZ /etc/localtime; echo $USER_TZ > /etc/timezone; dpkg-reconfigure -f noninteractive tzdata" > /dev/null 2>&1
 
-show_gui 3 $TOTAL "Installing UI & Wallpapers" "TermoOS Build"
+show_gui 3 $TOTAL "Installing UI & Wallpapers" "TermoOS Build" 4
 proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS openbox tint2 pcmanfm xterm whiptail x11-xserver-utils trash-cli xfonts-base desktop-base" > /dev/null 2>&1
 
-show_gui 4 $TOTAL "Installing VNC & Tools" "TermoOS Build"
+show_gui 4 $TOTAL "Installing VNC & Tools" "TermoOS Build" 2
 if [ "$VNC_APP_NAME" == "NoVNC" ]; then
     proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tightvncserver dbus-x11 novnc websockify" > /dev/null 2>&1
 else
     proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tightvncserver dbus-x11" > /dev/null 2>&1
 fi
 
-show_gui 5 $TOTAL "Installing Desktop Apps" "TermoOS Build"
+show_gui 5 $TOTAL "Installing Desktop Apps" "TermoOS Build" 3
 if [ "$TYPE_CHOICE" == "Basic" ]; then
     proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS nano dialog curl sudo mousepad galculator" > /dev/null 2>&1
 else
     proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS firefox-esr wget nano dialog curl sudo mousepad galculator htop neofetch" > /dev/null 2>&1
 fi
 
-show_gui 6 $TOTAL "Configuring Desktop Assets" "TermoOS Build"
+show_gui 6 $TOTAL "Configuring Desktop Assets" "TermoOS Build" 1
 mkdir -p "$PD_ROOT/root/Desktop" "$PD_ROOT/root/.config/tint2" "$PD_ROOT/root/.config/pcmanfm/default" "$PD_ROOT/root/.vnc" "$PD_ROOT/usr/local/bin" "$PD_ROOT/etc" "$PD_ROOT/tmp"
 
 # Pre-set Wallpaper Config
@@ -94,7 +99,7 @@ Icon=accessories-calculator
 Type=Application
 EOF
 
-show_gui 7 $TOTAL "Building App Store & Updater" "TermoOS Build"
+show_gui 7 $TOTAL "Building App Store & Updater" "TermoOS Build" 1
 
 # Feature Manager
 cat << 'EOF' > "$PD_ROOT/usr/local/bin/txde-features"
@@ -143,7 +148,7 @@ echo -e "[Desktop Entry]\nName=Updater\nExec=xterm -e /usr/local/bin/termo-updat
 echo -e "[Desktop Entry]\nName=Features\nExec=xterm -e /usr/local/bin/txde-features\nIcon=preferences-system-session\nType=Application\nTerminal=false" > "$PD_ROOT/root/Desktop/features.desktop"
 chmod +x "$PD_ROOT/root/Desktop/"*.desktop
 
-show_gui 8 $TOTAL "Building System Commands" "TermoOS Build"
+show_gui 8 $TOTAL "Building System Commands" "TermoOS Build" 1
 
 echo "VNC_USER=\"$USER_NAME\"" > "$PD_ROOT/etc/termo-vnc.conf"
 echo "VNC_PORT=\"5901\"" >> "$PD_ROOT/etc/termo-vnc.conf"
