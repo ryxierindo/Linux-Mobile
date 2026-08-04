@@ -102,6 +102,13 @@ USER_PASS="$USER_PASS"
 SPEED_FACTOR="$SPEED_FACTOR"
 EOF
 
+# Termux Outer Shortcut creation
+cat << 'EOF' > "${PREFIX:-/data/data/com.termux/files/usr}/bin/termo"
+#!/bin/bash
+proot-distro login debian -- boot Termo "$@"
+EOF
+chmod +x "${PREFIX:-/data/data/com.termux/files/usr}/bin/termo"
+
 echo "[+] Fetching the core installer engine (Part 2)..."
 if [ ! -f "installer.sh" ]; then
     wget -q https://raw.githubusercontent.com/ryxierindo/Linux-Mobile/main/installer.sh -O installer.sh
@@ -111,6 +118,6 @@ if [ -f "installer.sh" ]; then
     chmod +x installer.sh
     bash installer.sh
 else
-    echo "[-] Error: Could not download installer.sh. Check your internet connection."
+    echo "[-] Error: Could not find installer.sh locally or remotely."
     exit 1
 fi
