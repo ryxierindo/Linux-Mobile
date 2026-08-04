@@ -2,7 +2,7 @@
 
 # ==========================================
 # TermoOS Core Installer (Part 2)
-# Handles OS Build & TxDE Extraction
+# Handles OS Build & TxDE Extraction (TightVNC Edition)
 # ==========================================
 
 export TERM=xterm-256color
@@ -52,9 +52,9 @@ proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS openb
 
 show_gui 4 $TOTAL_MODULES "remote display protocols" "Installing TermoOS" 3
 if [ "$VNC_APP_NAME" == "NoVNC" ]; then
-    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tigervnc-standalone-server tigervnc-tools dbus-x11 novnc websockify" > /dev/null 2>&1
+    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tightvncserver dbus-x11 novnc websockify" > /dev/null 2>&1
 else
-    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tigervnc-standalone-server tigervnc-tools dbus-x11" > /dev/null 2>&1
+    proot-distro login debian -- bash -c "$ENV_VARS; apt-get install $APT_OPTS tightvncserver dbus-x11" > /dev/null 2>&1
 fi
 
 show_gui 5 $TOTAL_MODULES "extras (apps & tools)" "Installing TermoOS" 4
@@ -71,7 +71,7 @@ show_gui 6 $TOTAL_MODULES "vnc-config (startup scripts)" "Installing TermoOS" 1
 
 mkdir -p "$PD_ROOT/root/Desktop" "$PD_ROOT/root/.config/tint2" "$PD_ROOT/root/.vnc" "$PD_ROOT/usr/local/bin" "$PD_ROOT/etc" "$PD_ROOT/tmp"
 
-# Taskbar
+# Taskbar Configuration
 cat << 'EOF' > "$PD_ROOT/root/.config/tint2/tint2rc"
 panel_items = L:T:B:S
 panel_position = bottom center horizontal
@@ -92,6 +92,7 @@ time2_format = %d-%m-%Y
 systray_padding = 4
 systray_sort = ascending
 EOF
+
 # TxDE Features App
 cat << 'EOF' > "$PD_ROOT/usr/local/bin/txde-features"
 #!/bin/bash
@@ -189,7 +190,6 @@ TOGGLE_APPSTORE() { whiptail --msgbox "Use the Mode Switcher to handle the App S
 MAIN_MENU
 EOF
 chmod +x "$PD_ROOT/usr/local/bin/txde-features"
-
 # Base Shortcuts
 cat << 'EOF' > "$PD_ROOT/root/Desktop/mypc.desktop"
 [Desktop Entry]
@@ -260,6 +260,7 @@ Terminal=false
 EOF
     chmod +x "$PD_ROOT/root/Desktop/"*.desktop
 fi
+
 # Config Files
 echo "OS_TYPE=\"$TYPE_CHOICE\"" > "$PD_ROOT/etc/termo-os.conf"
 echo "OS_DE=\"$DE_NAME\"" >> "$PD_ROOT/etc/termo-os.conf"
@@ -282,16 +283,17 @@ ID_LIKE=debian
 HOME_URL="https://github.com/ryxierindo/Linux-Mobile"
 EOF
 
-# VNC and System Utilities
+# Robust TightVNC Startup Engine
 cat << 'EOF' > "$PD_ROOT/root/.vnc/xstartup"
-#!/bin/bash
-xrdb $HOME/.Xresources
-source /etc/termo-os.conf
+#!/bin/sh
+export DISPLAY=:1
 export XDG_SESSION_TYPE=x11
+export NO_AT_BRIDGE=1
+xrdb $HOME/.Xresources 2>/dev/null
 xsetroot -solid "#0078d7" &
-pcmanfm --desktop &
 tint2 &
-exec openbox-session
+pcmanfm --desktop &
+exec dbus-launch openbox-session
 EOF
 chmod +x "$PD_ROOT/root/.vnc/xstartup"
 
@@ -319,7 +321,7 @@ chmod +x "$PD_ROOT/usr/local/bin/vnc-details"
 cat << 'EOF' > "$PD_ROOT/usr/local/bin/vnc-setup"
 #!/bin/bash
 source /etc/termo-vnc.conf
-vncserver -kill $VNC_DISPLAY > /dev/null 2>&1
+tightvncserver -kill $VNC_DISPLAY > /dev/null 2>&1
 pkill websockify > /dev/null 2>&1
 
 NEW_USER=$(dialog --clear --title "VNC Setup" --inputbox "Enter new Username:" 8 40 "$VNC_USER" 3>&1 1>&2 2>&3)
@@ -361,11 +363,11 @@ show_gui() {
 }
 
 show_gui 1 3 "cleaning old sessions" "TermoOS Startup"
-vncserver -kill $VNC_DISPLAY > /dev/null 2>&1
+tightvncserver -kill $VNC_DISPLAY > /dev/null 2>&1
 pkill websockify > /dev/null 2>&1
 sleep 1
 show_gui 2 3 "launching graphical desktop" "TermoOS Startup"
-vncserver $VNC_DISPLAY -geometry 1280x720 -depth 24 -localhost no -SecurityTypes VncAuth,None -extension MIT-SHM > /dev/null 2>&1
+tightvncserver $VNC_DISPLAY -geometry 1280x720 -depth 24 > /dev/null 2>&1
 sleep 1
 show_gui 3 3 "finalizing setup" "TermoOS Startup"
 if [ "$VNC_TYPE" == "NoVNC" ]; then
@@ -383,18 +385,23 @@ fi
 EOF
 chmod +x "$PD_ROOT/usr/local/bin/boot-termo"
 
-ln -sf boot-termo "$PD_ROOT/usr/local/bin/vnc"
-
+# Command Aliases & PATH Guarantees
 cat << 'EOF' > "$PD_ROOT/usr/local/bin/boot"
 #!/bin/bash
 if [ "$1" == "Termo" ] || [ "$1" == "termo" ]; then shift; boot-termo "$@"; else boot-termo "$@"; fi
 EOF
 chmod +x "$PD_ROOT/usr/local/bin/boot"
 
-echo "$USER_PASS" > "$PD_ROOT/tmp/vncpass.txt"
-proot-distro login debian -- bash -c "mkdir -p ~/.config/tigervnc ~/.vnc && cat /tmp/vncpass.txt | vncpasswd -f > ~/.vnc/passwd && chmod 600 ~/.vnc/passwd && cp ~/.vnc/passwd ~/.config/tigervnc/passwd && chmod 600 ~/.config/tigervnc/passwd" > /dev/null 2>&1
-rm -f "$PD_ROOT/tmp/vncpass.txt"
+# Universal Symlink Fix (Guarantees PATH resolution inside Debian)
+ln -sf /usr/local/bin/boot "$PD_ROOT/usr/bin/boot"
+ln -sf /usr/local/bin/boot-termo "$PD_ROOT/usr/bin/boot-termo"
+ln -sf /usr/local/bin/vnc-details "$PD_ROOT/usr/bin/vnc-details"
+ln -sf /usr/local/bin/vnc-setup "$PD_ROOT/usr/bin/vnc-setup"
+ln -sf /usr/local/bin/txde-features "$PD_ROOT/usr/bin/txde-features"
 
+echo "$USER_PASS" > "$PD_ROOT/tmp/vncpass.txt"
+proot-distro login debian -- bash -c "mkdir -p ~/.vnc && cat /tmp/vncpass.txt | vncpasswd -f > ~/.vnc/passwd && chmod 600 ~/.vnc/passwd" > /dev/null 2>&1
+rm -f "$PD_ROOT/tmp/vncpass.txt"
 show_gui 7 $TOTAL_MODULES "termo-update (smart app)" "Installing TermoOS" 1
 
 # Windows-Style GUI Updater
@@ -448,12 +455,12 @@ RESET_OS() {
     if whiptail --title "Reset the OS" --yesno "WARNING: This will delete your Desktop, UI settings, passwords, and VNC configs.\n\nThe base Debian OS will NOT be deleted.\n\nContinue with Reset?" 12 60; then
         clear
         echo "[+] Wiping TxDE configurations and user data..."
-        rm -rf /root/Desktop /root/.config/tint2 /root/.vnc /root/.config/tigervnc
+        rm -rf /root/Desktop /root/.config/tint2 /root/.vnc
         rm -f /etc/termo-* /usr/local/bin/txde-* /usr/local/bin/vnc* /usr/local/bin/boot* /usr/local/bin/termo-update
         
         export DEBIAN_FRONTEND=noninteractive
         echo "[+] Removing UI packages..."
-        apt-get purge -y openbox tint2 pcmanfm xterm whiptail firefox-esr tigervnc-standalone-server tigervnc-tools novnc websockify > /dev/null 2>&1
+        apt-get purge -y openbox tint2 pcmanfm xterm whiptail firefox-esr tightvncserver novnc websockify > /dev/null 2>&1
         apt-get autoremove -y > /dev/null 2>&1
         
         echo ""
@@ -491,6 +498,7 @@ REINSTALL_OS() {
 MAIN_MENU
 EOF
 chmod +x "$PD_ROOT/usr/local/bin/termo-update"
+ln -sf /usr/local/bin/termo-update "$PD_ROOT/usr/bin/termo-update"
 
 cat << 'EOF' > "$PD_ROOT/root/Desktop/updater.desktop"
 [Desktop Entry]
@@ -506,6 +514,7 @@ chmod +x "$PD_ROOT/root/Desktop/updater.desktop"
 show_gui 8 $TOTAL_MODULES "termo-modules (app store script)" "Installing TermoOS" 1
 curl -s https://raw.githubusercontent.com/ryxierindo/Linux-Mobile/main/termo-modules.sh -o "$PD_ROOT/usr/local/bin/termo-modules"
 chmod +x "$PD_ROOT/usr/local/bin/termo-modules"
+ln -sf /usr/local/bin/termo-modules "$PD_ROOT/usr/bin/termo-modules"
 
 # Cleanup Temp Vars
 rm -f termo_config.env
@@ -516,9 +525,9 @@ echo -e "\n\nSuccess! TermoOS (TxDE Edition) is installed."
 echo "----------------------------------------"
 echo "To enter TermoOS, type: proot-distro login debian"
 echo "Inside TermoOS, your startup commands are:"
-echo " - boot Termo          (Starts desktop with GUI loading bar)"
-echo " - boot Termo details  (Shows login info)"
+echo " - boot Termo          (Starts desktop server)"
+echo " - boot Termo details  (Shows connection info)"
 echo " - boot Termo setup    (Changes port/username/password)"
 echo " - termo-update        (Windows-Style Updater & Reset tool)"
-echo " - txde-features       (Opens the blue Feature mode GUI)"
+echo " - txde-features       (Opens the Feature mode GUI)"
 echo "----------------------------------------"
